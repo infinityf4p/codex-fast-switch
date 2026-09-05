@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.1
+
+- Use the app's filled lightning glyph for Fast in both collapsed model-picker layouts.
+- Upgrade existing patches through their original backup when the patch revision changes.
+- Include the fix that prevents repeated restart commands from bouncing an already patched app.
+
 ## 0.2.0
 
 - Add Apply and Restart.command: normal quit, patch, and reopen the existing app.

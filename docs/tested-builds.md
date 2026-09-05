@@ -1,5 +1,16 @@
 # Tested builds
 
+## 2026-09-05: filled Fast icon, 0.2.1
+
+Local verification used **26.901.41600 (7982)** on **arm64**.
+
+- Source checks and 29 core/native tests passed, including filled glyph rendering with preserved dimensions and props.
+- All 12 transaction and interruption tests passed at **10:05:24 UTC**.
+- A separate copy was installed using the previous 0.2.0 implementation, upgraded to revision 2, verified to contain the filled icon, and restored to the exact officially signed original. Repeated installation was idempotent.
+- The optional UI test passed at **10:07:59 UTC**. The collapsed model control screenshot showed a filled lightning glyph. `gpt-6-astra` sent `priority` for Fast and omitted the tier for Standard through the loopback mock.
+- An earlier UI attempt timed out during onboarding, and a separate restart probe timed out attaching CDP during relaunch. Those attempts are not counted as passing. The later UI run completed successfully; the test harness now captures renderer diagnostics on UI timeouts.
+- Test copies were cleaned up and the installed app was not modified by these tests. No relay credentials or private server were used.
+
 ## 2026-09-05: direct restart, 0.2.0
 
 Local verification used **26.901.41600 (7982)** on **arm64**.

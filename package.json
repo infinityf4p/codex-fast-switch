@@ -1,6 +1,6 @@
 {
   "name": "codex-fast-switch",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "private": true,
   "description": "Reversible native Fast mode patches for the Codex desktop app on macOS",
   "license": "MIT",

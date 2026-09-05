@@ -10,15 +10,17 @@
 
 - 目前仅支持 **macOS**，要求 macOS 13 及以上、支持克隆的 APFS 卷；官方 App 可能要求更高版本系统。
 - Apple Silicon 已实测。辅助程序包含 Intel 架构，但尚未在 Intel Mac 上验证完整流程。Windows、Linux 不支持安装补丁；CI 额外在 Linux 上检查可移植的核心逻辑。
-- 已验证 App **26.901.41123 (7942)** 和 **26.901.41600 (7982)**，Bundle ID 为 `com.openai.codex`。支持名为 `Codex.app` 或 `ChatGPT.app` 的对应桌面应用，不接受其他 Bundle ID 的消费版 ChatGPT。
+- 当前补丁已验证 App **26.901.41600 (7982)**，早期补丁还验证过 **26.901.41123 (7942)**，Bundle ID 为 `com.openai.codex`。支持名为 `Codex.app` 或 `ChatGPT.app` 的对应桌面应用，不接受其他 Bundle ID 的消费版 ChatGPT。
 - 所选模型须在 App 自带目录中拥有 priority 元数据，不会自动支持服务商自定义的任意模型别名。
-- 新版本须匹配三个完整函数结构。文件名、压缩变量名、空白和引号变化可以兼容；不保证适配任意未来版本。
+- 新版本须匹配三个完整函数结构及 Fast 图标组件。文件名、压缩变量名、空白和引号变化可以兼容；不保证适配任意未来版本。
 
 ## 使用
 
 从 [Releases](https://github.com/infinityf4p/codex-fast-switch/releases) 下载 macOS ZIP，解压后运行 **Enable Automatic Fast.command**。发布包含依赖和通用架构辅助程序，Node 运行时取自本机已安装的 App 或系统，不包含官方 App 和 Node 分发包。
 
 接着运行 **Apply and Restart.command**：正常退出 App、应用补丁、自动重新打开。安装没有固定的文件稳定等待，也不再启动临时 App 做 UI 测试。重开后在 **Settings > General > Speed** 中切换，运行 Check Status.command 可查看结果。
+
+两套收起后的模型控件均使用 App 内置的实心闪电。升级旧补丁时，从新包运行 Enable Automatic Fast.command，再运行 Apply and Restart.command；程序会恢复对应原版备份，再自动应用新修订。
 
 自动服务会监听退出事件，为后续兼容更新应用补丁；每 10 秒的兜底检查用于补充遗漏事件，不会让直接重启命令等待。如果手动重开恰好撞上正在修改，后台会等下次退出。使用 Apply and Restart.command 可由程序完成整个顺序。
 
@@ -58,7 +60,7 @@ node cli.cjs restore
 
 ## 修改与回退
 
-安装器先校验原版签名、Bundle ID 和签名团队，再唯一匹配三个完整函数，校验变换后的结构，检查 12 组登录、策略和加载状态。已有的 `fast_mode = false` 限制仍然有效。
+安装器先校验原版签名、Bundle ID 和签名团队，再唯一匹配三个完整函数及 Fast 图标，校验变换后的结构，检查 12 组登录、策略和加载状态。旧版收起控件复用 App 内置的实心图标。已有的 `fast_mode = false` 限制仍然有效。
 
 随后克隆完整 App，修改归档、重算完整性校验并进行本地签名。确认原版仍已退出且未被更新器替换后，交换完整 App 并保留原版备份。
 
