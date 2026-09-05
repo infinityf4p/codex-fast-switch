@@ -1,4 +1,4 @@
 @echo off
 setlocal DisableDelayedExpansion
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0bin\run.ps1" uninstall %*
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0launchers\windows\run.ps1" uninstall %*
 exit /b %errorlevel%

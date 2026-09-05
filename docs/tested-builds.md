@@ -1,5 +1,9 @@
 # Tested builds
 
+## 2026-09-05: repository layout, not tested
+
+Shared and platform code, launchers and test tools were moved into dedicated directories. CLI dispatch, worker file lists, native helper locations, packaging and Windows legacy Startup-path handling were updated. Existing test imports and commands follow the new paths. At the user's request, no tests or app installation, upgrade, launch or uninstall flows were run for this change. Earlier results below apply to the previous layout.
+
 ## 2026-09-05: Windows install and uninstall scripts, not tested
 
 The standalone Windows scripts are now `install.cmd` and `uninstall.cmd`. Setup enables monitoring and opens the copy; uninstall removes all Fast Switch installation files after normal Quit and worker shutdown, while retaining Codex's own profile. README download commands and packaging were updated. At the user's request, the scripts, cleanup logic and installation flows were not executed for testing.

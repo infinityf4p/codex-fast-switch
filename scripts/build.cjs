@@ -1,21 +1,24 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const { execFileSync } = require('node:child_process');
-const { requireMac } = require('../lib/platform.cjs');
 if (process.platform === 'win32') {
   execFileSync(process.execPath, [path.join(__dirname, 'check.cjs')], { stdio: 'inherit' });
   console.log('Windows scripts are ready; no compiler is required.');
   process.exit(0);
 }
-requireMac();
+require('../src/platforms/macos/platform.cjs').requireMac();
 const root = path.join(__dirname, '..');
+const build = path.join(root, 'build/macos');
+fs.mkdirSync(build, { recursive: true });
 execFileSync('/usr/bin/xcrun', ['clang', '-O2', '-fobjc-arc', '-arch', 'arm64', '-arch', 'x86_64',
-  '-mmacosx-version-min=13.0', '-framework', 'AppKit', path.join(root, 'lib/native.m'), '-o', path.join(root, 'lib/native-helper')], { stdio: 'inherit' });
-fs.chmodSync(path.join(root, 'lib/native-helper'), 0o755);
+  '-mmacosx-version-min=13.0', '-framework', 'AppKit', path.join(root, 'src/platforms/macos/native.m'), '-o', path.join(build, 'native-helper')], { stdio: 'inherit' });
+fs.chmodSync(path.join(build, 'native-helper'), 0o755);
 execFileSync('/usr/bin/xcrun', ['clang', '-O2', '-fobjc-arc', '-arch', 'arm64', '-arch', 'x86_64',
   '-mmacosx-version-min=13.0', '-Wno-deprecated-declarations', '-framework', 'Foundation', '-framework', 'Security',
-  path.join(root, 'lib/signing-native.m'), '-o', path.join(root, 'lib/signing-helper')], { stdio: 'inherit' });
-fs.chmodSync(path.join(root, 'lib/signing-helper'), 0o755);
-for (const file of fs.readdirSync(root).filter(file => file.endsWith('.command'))) fs.chmodSync(path.join(root, file), 0o755);
-fs.chmodSync(path.join(root, 'bin/run.zsh'), 0o755);
+  path.join(root, 'src/platforms/macos/signing-native.m'), '-o', path.join(build, 'signing-helper')], { stdio: 'inherit' });
+fs.chmodSync(path.join(build, 'signing-helper'), 0o755);
+const launchers = path.join(root, 'launchers/macos');
+for (const file of fs.readdirSync(launchers).filter(file => file.endsWith('.command') || file.endsWith('.zsh'))) {
+  fs.chmodSync(path.join(launchers, file), 0o755);
+}
 console.log('Built universal macOS helper (arm64 + x86_64).');

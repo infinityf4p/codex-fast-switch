@@ -14,16 +14,16 @@
   },
   "scripts": {
     "check": "node scripts/check.cjs",
-    "test": "node --test test/*.test.cjs",
+    "test": "node --test test/unit/*.test.cjs",
     "build": "node scripts/build.cjs",
     "package": "node scripts/package.cjs",
     "package:windows": "node scripts/package-windows.cjs",
-    "test:windows:integration": "node test/windows-integration.cjs",
-    "test:transactions": "node test/transactions.cjs",
-    "test:signing": "node test/signing.cjs",
-    "test:restart": "node test/restart.cjs",
-    "test:e2e": "node test/e2e.cjs",
-    "test:launchagent": "node test/launchagent.cjs"
+    "test:windows:integration": "node test/integration/windows/integration.cjs",
+    "test:transactions": "node test/integration/macos/transactions.cjs",
+    "test:signing": "node test/integration/macos/signing.cjs",
+    "test:restart": "node test/integration/macos/restart.cjs",
+    "test:e2e": "node test/integration/macos/e2e.cjs",
+    "test:launchagent": "node test/integration/macos/launchagent.cjs"
   },
   "dependencies": {
     "@electron/asar": "4.1.0",

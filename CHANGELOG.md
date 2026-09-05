@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Organize shared code under src/core and platform implementations under src/platforms; group auxiliary launchers, unit tests, integration flows and test support separately.
+- Keep the root CLI and one-click install/uninstall entry points stable, recognize legacy Windows Startup paths during upgrades and uninstall, and track worker layout separately from app patch revisions.
+- Share a runtime file list between installed workers and release packaging, rebuild clean staging directories, and keep development tools, tests and the other platform out of release packages. macOS helper binaries now live under build/macos.
 - Rename the standalone Windows installer to install.cmd and add uninstall.cmd, with matching download links and one-command PowerShell entries in both READMEs.
 - Combine Windows installation, monitor setup and app launch; avoid restarting a current local copy unnecessarily.
 - Add complete Windows uninstall: normal Quit, Startup removal, worker shutdown, owned-file cleanup and return to the original app. Preserve Codex's personal profile. These changes have not been tested locally.

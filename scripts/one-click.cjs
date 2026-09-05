@@ -7,7 +7,7 @@ function oneClickScript(archive, packageName, command = 'setup') {
   if (!['setup', 'uninstall'].includes(command)) throw new Error('Invalid Windows one-click command.');
   const hash = createHash('sha256').update(archive).digest('hex');
   const payload = archive.toString('base64').match(/.{1,120}/g)?.join('\n') || '';
-  const script = fs.readFileSync(path.join(__dirname, '../windows/setup.ps1'), 'utf8')
+  const script = fs.readFileSync(path.join(__dirname, 'windows-standalone.ps1'), 'utf8')
     .replace('__CODEX_FAST_SHA256__', hash)
     .replaceAll('__CODEX_FAST_PACKAGE__', packageName)
     .replace('__CODEX_FAST_COMMAND__', command)

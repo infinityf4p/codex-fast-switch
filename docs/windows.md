@@ -1,6 +1,6 @@
 # Windows
 
-The Windows implementation prepares a separate local Codex copy. It does not take ownership of WindowsApps, modify the Store package, register a replacement MSIX, or replace the original Start menu entry. Use `Open Codex Fast.cmd` for the patched copy. Official updates, protocol handlers and file associations continue to belong to the original installation.
+The Windows implementation prepares a separate local Codex copy. It does not take ownership of WindowsApps, modify the Store package, register a replacement MSIX, or replace the original Start menu entry. Use `launchers/windows/Open Codex Fast.cmd` for the patched copy. Official updates, protocol handlers and file associations continue to belong to the original installation.
 
 ## Fast UI
 
@@ -23,6 +23,8 @@ The standalone **install.cmd** and **uninstall.cmd** each embed the complete Win
 **install.cmd** runs `setup`: prepare or upgrade the local copy, install or update automatic monitoring, and open Codex. A current copy is not restarted when the original app is closed. **uninstall.cmd** runs `uninstall`: request normal Quit for local copies, disable the monitor, remove the Startup entry, delete all owned installation files, and return to the official app. The launcher uses a temporary Node copy during uninstall so an installed worker runtime does not prevent its own removal.
 
 The README includes PowerShell commands that download and run the scripts from the latest GitHub Release. Those links require publishing `dist/install.cmd` and `dist/uninstall.cmd` as Release attachments under those exact names.
+
+In a source checkout or extracted Windows ZIP, `install.cmd` and `uninstall.cmd` are at the root. The other scripts below are in `launchers/windows` alongside their PowerShell runner. Source checkouts require `npm ci --ignore-scripts`; release packages include dependencies.
 
 | File | Effect |
 | --- | --- |
@@ -68,21 +70,17 @@ agent/                stable worker code and copied Node runtime
 
 The Startup shortcut has a name derived from the state path. It starts the worker hidden at login. The worker polls every 10 seconds and waits until the source and current copy are both closed. An unsupported build is rejected once until its files change, the patch revision changes, or monitoring is enabled again. A live installer lock excludes another installer; a separate worker lock prevents duplicate monitors. Disable takes effect by the next poll.
 
+Worker code is under `agent/src`, with the copied runtime still at `agent/node.exe`. Setup rewrites older Startup entries to `agent/src/platforms/windows/native.ps1`. Both setup and uninstall recognize the earlier `agent/windows/native.ps1` entry. A separate `workerLayout` field refreshes an enabled monitor after a directory-layout change even when the app patch revision is unchanged. Existing generations, state paths and personal Codex data retain their locations; full uninstall also removes older files remaining under `agent`.
+
 Failed operations record their phase, error code and message in `windows-status.json`. Native Windows errors are returned as structured data so the CLI can show the actual cause.
 
 Backups and state must remain trusted and local. Local generations consume disk space until **uninstall.cmd** removes the installation. Backups are not needed afterward because a reinstall copies the official app again. The package itself contains only this project's code and npm dependencies; official application binaries are copied from the user's installation at runtime.
 
 ## Development
 
-```powershell
-npm ci --ignore-scripts
-npm run check
-npm test
-npm run build
-npm run package:windows
-```
+The implementation is in `src/platforms/windows`; patching and Fast UI rules are shared through `src/core`. The standalone installer template is `scripts/windows-standalone.ps1`. See the [README](../README.en.md#development) for source setup, checks and release packaging. Release ZIPs contain the shared runtime and Windows implementation; development tools and tests are available in the source checkout.
 
-Packaging produces the Windows ZIP, standalone `install.cmd` and `uninstall.cmd`, and `SHA256SUMS-windows.txt`. Upload these files to the same GitHub Release to enable the README download commands. Local packaging does not publish a release.
+## Validation
 
 Core tests use synthetic archives and PE resources. They cover unchanged source data, independent generations, invalid records, tampering, updates during preparation, normal-close cancellation, retry suppression and real child-process exit before publication. The Windows CI job builds and validates the ZIP without downloading the official app. See [tested builds](tested-builds.md) for local app verification.
 
@@ -94,6 +92,6 @@ npm run test:windows:integration -- "C:\temporary\fast-switch-test"
 
 It prepares a copy, registers a temporary Startup worker, checks waiting-for-exit and worker replacement, disables the worker, removes its shortcut and restores the original launch target. It never requests that the original app quit.
 
-`node test/windows-quit.cjs "C:\path\to\prepared\app" --close-to-tray` verifies window-close-to-tray behavior, restores the test window and requests normal Quit. It requires a stopped patched copy and a running original; only the copy uses temporary credentials and a separate profile. It checks that the original remains running.
+`node test/integration/windows/quit.cjs "C:\path\to\prepared\app" --close-to-tray` verifies window-close-to-tray behavior, restores the test window and requests normal Quit. It requires a stopped patched copy and a running original; only the copy uses temporary credentials and a separate profile. It checks that the original remains running.
 
-The separate UI test accepts a prepared copy: `node lib/health.cjs "C:\path\to\prepared\app"`. It uses temporary Codex credentials, a separate browser profile and a loopback model provider. The Windows test selects the documented unelevated sandbox in read-only mode. The app itself can still contact its normal initialization services and download runtime/plugins; the probe is not a network sandbox. Do not run it against an active personal profile.
+The separate UI test accepts a prepared copy: `node test/support/health.cjs "C:\path\to\prepared\app"`. It uses temporary Codex credentials, a separate browser profile and a loopback model provider. The Windows test selects the documented unelevated sandbox in read-only mode. The app itself can still contact its normal initialization services and download runtime/plugins; the probe is not a network sandbox. Do not run it against an active personal profile.
