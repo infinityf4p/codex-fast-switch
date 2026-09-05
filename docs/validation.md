@@ -1,6 +1,6 @@
 # Validation boundaries
 
-The release targets the code shape reviewed in app 26.901.41123, build 7942. Structural tests simulate renamed variables, quote changes and split chunks; they are not evidence about unreleased app builds.
+The reviewed code shape also matches app 26.901.41600, build 7982. Structural tests simulate renamed variables, quote changes and split chunks; they are not evidence about unreleased app builds.
 
 ## What an installation verifies
 
@@ -8,9 +8,13 @@ The original app passes `codesign --verify --deep --strict` with an inline requi
 
 Acorn parses packed JavaScript under `webview/`. Each entire target function must match a bundled fingerprint. Normalization removes locations and normalizes identifier spelling and literal quote style. It keeps operators, control flow, property names and values. Duplicate or missing targets are rejected. The transformed functions must match separate reviewed hashes. Isolated VM tests verify API-key and ChatGPT eligibility, absent authentication, loading state and `fast_mode = false` restrictions.
 
-The app copy uses a temporary HOME, CODEX_HOME, working directory and Electron profile. The child environment is built from an allowlist, excluding API credentials, Node injection options, proxy settings and inherited provider overrides. Auth is explicitly file-based with a dummy local key. Model discovery uses the bundled backend's `model/list` protocol and requires reported `priority` capability. It does not read the user's real model configuration.
+The installer clones the bundle, updates ASAR integrity, signs locally, and exchanges complete bundles while retaining the original. It checks the file identity during exchange to avoid overwriting an unrelated update. It has no fixed stability timer and does not launch a test app or call a model API.
 
-The test uses CDP over inherited pipes, not a listening debugging port. CDP reads DOM state and dispatches normal mouse/keyboard input; it does not inject a patch into the renderer. English onboarding and Settings are currently expected. A changed layout, locale override or missing control causes a timeout and prevents activation.
+## Optional developer UI test
+
+`npm run test:e2e` explicitly adds UI verification on a temporary copy. This is not run by install, restart or automatic monitoring. The app copy uses a temporary HOME, CODEX_HOME, working directory and Electron profile. The child environment excludes API credentials, Node injection options, proxy settings and inherited provider overrides. Auth is file-based with a dummy local key. Model discovery uses the bundled backend's `model/list` protocol and requires reported `priority` capability. It does not read the user's real model configuration.
+
+The test uses CDP over inherited pipes, not a listening debugging port. CDP reads DOM state and dispatches normal mouse/keyboard input; it does not inject a patch into the renderer. English onboarding and Settings are currently expected. A changed layout, locale override or missing control fails this optional test; installation does not depend on the test layout.
 
 The test selects Fast, creates a new task, receives a complete local mock response, then repeats for Standard. It checks saved config and outgoing request bodies. All test model requests use a loopback HTTP server. Additional title-generation requests can also reach that mock.
 

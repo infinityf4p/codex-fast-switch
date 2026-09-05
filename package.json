@@ -1,6 +1,6 @@
 {
   "name": "codex-fast-switch",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "description": "Reversible native Fast mode patches for the Codex desktop app on macOS",
   "license": "MIT",
@@ -13,6 +13,7 @@
     "build": "node scripts/build.cjs",
     "package": "node scripts/package.cjs",
     "test:transactions": "node test/transactions.cjs",
+    "test:restart": "node test/restart.cjs",
     "test:e2e": "node test/e2e.cjs",
     "test:launchagent": "node test/launchagent.cjs"
   },

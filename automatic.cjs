@@ -4,6 +4,7 @@ const os = require('node:os');
 const crypto = require('node:crypto');
 const { execFileSync } = require('node:child_process');
 const transaction = require('./lib/transaction.cjs');
+const { restart: performRestart } = require('./lib/restart.cjs');
 const { assertStopped, identityFiles, discoverApp, requireMac, assertRuntime } = require('./lib/platform.cjs');
 const { DEFAULT_STATE, saveJson, readJson, withLock, marker, PATCH_ID } = transaction;
 const LABEL = 'io.github.infinityf4p.codex-fast-switch';
@@ -60,12 +61,11 @@ async function tick(state = DEFAULT_STATE, { now = Date.now(), install = transac
         try { notifyUser('An interrupted Fast patch was rolled back. The unmodified app for that version is available. Automatic retries are paused until the next update.'); } catch {}
         return { status: 'recovered', result };
       }
-      if (previous.candidateStamp !== currentStamp) return finish('waiting-for-stable-update', { candidateStamp: currentStamp, candidateSince: now });
-      if (now - previous.candidateSince < 30000) return { status: 'waiting-for-stable-update' };
       const result = await install(app, state, { model: config.model });
       if (!['installed', 'already-installed'].includes(result.status)) throw new Error(`Patch was not activated: ${result.status}`);
       return finish('installed', { result, successStamp: JSON.stringify(getStamp(app)), rejectedStamp: null, error: null });
     } catch (error) {
+      if (error.code === 'APP_RUNNING') return finish('waiting-for-exit');
       let failedStamp = currentStamp;
       try { failedStamp = JSON.stringify(getStamp(app)); } catch {}
       let pending = false;
@@ -96,7 +96,8 @@ function stopService(state) {
   execFileSync('/bin/launchctl', ['bootout', service()], { stdio: 'pipe' });
 }
 function plistDefinition(node, worker, state) {
-  return { Label: LABEL, ProgramArguments: [node, worker, 'tick', state], RunAtLoad: true, StartInterval: 60,
+  return { Label: LABEL, ProgramArguments: [node, worker, 'watch', state], RunAtLoad: true,
+    KeepAlive: { SuccessfulExit: false }, ThrottleInterval: 10,
     ProcessType: 'Background', LowPriorityIO: true, LimitLoadToSessionType: 'Aqua',
     StandardOutPath: path.join(state, 'automatic.log'), StandardErrorPath: path.join(state, 'automatic-error.log'),
     EnvironmentVariables: { PATH: '/usr/bin:/bin:/usr/sbin:/sbin' } };
@@ -119,7 +120,7 @@ function installAgent(state, app, model) {
   const staged = path.join(state, `.agent-${crypto.randomUUID()}`);
   fs.mkdirSync(staged, { mode: 0o700 });
   try {
-    for (const item of ['automatic.cjs', 'cli.cjs', 'lib', 'node_modules', 'package.json', 'package-lock.json', 'README.md', 'LICENSE']) {
+    for (const item of ['automatic.cjs', 'cli.cjs', 'watch.cjs', 'lib', 'node_modules', 'package.json', 'package-lock.json', 'README.md', 'LICENSE']) {
       fs.cpSync(path.join(__dirname, item), path.join(staged, item), { recursive: true, verbatimSymlinks: true });
     }
     fs.mkdirSync(path.join(staged, 'runtime'));
@@ -140,7 +141,8 @@ function installAgent(state, app, model) {
     saveJson(configPath(state), { enabled: true, app, model, enabledAt: new Date().toISOString() });
     if (fs.existsSync(statusPath(state))) fs.rmSync(statusPath(state));
     execFileSync('/bin/launchctl', ['bootstrap', `gui/${process.getuid()}`, plist]);
-    return { status: 'enabled', app, intervalSeconds: 60, appliesWhenAppIsClosed: true };
+    return { status: 'enabled', app, appliesOnExit: true,
+      nextStep: 'Run Apply and Restart.command to apply now and reopen the app automatically.' };
   } catch (error) {
     saveJson(configPath(state), { enabled: false, app, error: error.message });
     throw error;
@@ -166,6 +168,27 @@ function status(state = DEFAULT_STATE) {
   return { configuration: readOptional(configPath(state)), lastCheck: readOptional(statusPath(state)),
     transaction: readOptional(transaction.recordPath(state)) };
 }
+async function restart(state = DEFAULT_STATE, app = discoverApp(), options = {}) {
+  return withLock(state, async () => {
+    const onPhase = phase => {
+      saveJson(statusPath(state), { status: 'restarting', phase, checkedAt: new Date().toISOString() });
+      options.onPhase?.(phase);
+    };
+    try {
+      const result = await performRestart(app, state, { ...options, onPhase });
+      saveJson(statusPath(state), { status: 'installed', checkedAt: new Date().toISOString(),
+        successStamp: JSON.stringify(stamp(app)), result });
+      return result;
+    } catch (error) {
+      let rejectedStamp;
+      const waitingForExit = ['QUIT_TIMEOUT', 'APP_RUNNING'].includes(error.code);
+      if (!waitingForExit) try { rejectedStamp = JSON.stringify(stamp(app)); } catch {}
+      saveJson(statusPath(state), { status: waitingForExit ? 'waiting-for-exit' : 'failed', checkedAt: new Date().toISOString(),
+        error: error.message, rejectedStamp, reopenedAfterFailure: error.reopenedAfterFailure });
+      throw error;
+    }
+  });
+}
 async function restore(state = DEFAULT_STATE, app = discoverApp()) {
   return withLock(state, async () => {
     disableUnlocked(state);
@@ -173,13 +196,14 @@ async function restore(state = DEFAULT_STATE, app = discoverApp()) {
     return transaction.restore(app, state);
   });
 }
-module.exports = { tick, enable, disable, restore, status, stamp, configPath, statusPath, plistDefinition };
+module.exports = { tick, enable, disable, restore, status, stamp, configPath, statusPath, plistDefinition, restart };
 if (require.main === module) {
   const [command = 'status', state = DEFAULT_STATE] = process.argv.slice(2);
   Promise.resolve().then(() => {
     requireMac();
-    if (command !== 'tick') throw new Error('Use cli.cjs for interactive commands.');
-    return tick(state);
+    if (command === 'watch') return require('./watch.cjs').watch(state);
+    if (command === 'tick') return tick(state);
+    throw new Error('Use cli.cjs for interactive commands.');
   }).then(result => { if (command !== 'tick') console.log(JSON.stringify(result, null, 2)); })
     .catch(error => { console.error(error.message); process.exitCode = 1; });
 }

@@ -35,7 +35,7 @@ async function main() {
     loaded = false;
     assert.throws(() => execFileSync('/bin/launchctl', ['print', service], { stdio: 'pipe' }));
     const report = { testedAt: new Date().toISOString(), startedByLaunchd: true, copiedIndependentNodeRuntime: true,
-      productionServiceInstalled: false, temporaryServiceRemoved: true, intervalSeconds: data.StartInterval };
+      productionServiceInstalled: false, temporaryServiceRemoved: true, restartOnFailure: data.KeepAlive.SuccessfulExit === false };
     console.log(JSON.stringify(report));
   } finally {
     if (loaded) execFileSync('/bin/launchctl', ['bootout', service]);

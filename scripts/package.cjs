@@ -12,9 +12,9 @@ const stage = path.join(dist, name);
 if (fs.existsSync(stage)) fs.rmSync(stage, { recursive: true });
 fs.mkdirSync(stage, { recursive: true });
 execFileSync(process.execPath, [path.join(__dirname, 'build.cjs')], { stdio: 'inherit' });
-const files = ['automatic.cjs', 'cli.cjs', 'lib', 'bin', 'docs', 'scripts', 'test', 'node_modules', 'package.json',
+const files = ['automatic.cjs', 'cli.cjs', 'watch.cjs', 'lib', 'bin', 'docs', 'scripts', 'test', 'node_modules', 'package.json',
   'package-lock.json', 'README.md', 'README.zh-CN.md', 'LICENSE', 'THIRD_PARTY_NOTICES.md', 'CONTRIBUTING.md', 'SECURITY.md', 'CHANGELOG.md',
-  'Apply Once.command', 'Enable Automatic Fast.command', 'Disable Automatic Fast.command', 'Restore Original App.command', 'Check Status.command'];
+  'Apply Once.command', 'Apply and Restart.command', 'Enable Automatic Fast.command', 'Disable Automatic Fast.command', 'Restore Original App.command', 'Check Status.command'];
 for (const file of files) fs.cpSync(path.join(root, file), path.join(stage, file), { recursive: true, verbatimSymlinks: true });
 const zip = path.join(dist, `${name}.zip`);
 if (fs.existsSync(zip)) fs.rmSync(zip);
