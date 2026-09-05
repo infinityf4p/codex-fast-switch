@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.2
+
+- Add an online one-command installer that downloads the latest release and checks its SHA-256 digest.
+- Add Install or Update.command and `setup` to enable automatic patching, apply the patch, and reopen the app in one operation.
+- Preserve the existing no-restart behavior when the current patch is already installed.
+
 ## 0.2.1
 
 - Use the app's filled lightning glyph for Fast in both collapsed model-picker layouts.

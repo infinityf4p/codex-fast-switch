@@ -16,15 +16,22 @@
 
 ## 使用
 
-从 [Releases](https://github.com/infinityf4p/codex-fast-switch/releases) 下载 macOS ZIP，解压后运行 **Enable Automatic Fast.command**。发布包含依赖和通用架构辅助程序，Node 运行时取自本机已安装的 App 或系统，不包含官方 App 和 Node 分发包。
+在终端执行一条命令，即可下载最新版并完成安装或升级：
 
-接着运行 **Apply and Restart.command**：正常退出 App、应用补丁、自动重新打开。安装没有固定的文件稳定等待，也不再启动临时 App 做 UI 测试。重开后在 **Settings > General > Speed** 中切换，运行 Check Status.command 可查看结果。
+```sh
+curl -fsSL https://github.com/infinityf4p/codex-fast-switch/releases/latest/download/install.sh | /bin/sh
+```
 
-两套收起后的模型控件均使用 App 内置的实心闪电。升级旧补丁时，从新包运行 Enable Automatic Fast.command，再运行 Apply and Restart.command；程序会恢复对应原版备份，再自动应用新修订。
+脚本会校验发布包的 SHA-256、安装自动补丁服务、正常退出 App、应用补丁并重开。当前补丁已经是最新版时，不会重复重启。可以先查看 [install.sh](install.sh) 的源码。
+
+也可从 [Releases](https://github.com/infinityf4p/codex-fast-switch/releases) 下载 macOS ZIP，解压后只需双击 **Install or Update.command**。发布包含依赖和通用架构辅助程序，复用 App、旧安装或系统中的 Node 运行时，不分发官方 App 和 Node。
+
+安装没有固定的文件稳定等待，也不启动临时 App 做 UI 测试。重开后在 **Settings > General > Speed** 中切换。两套收起后的模型控件均使用 App 内置的实心闪电，旧补丁会通过对应原版备份自动升级。Check Status.command 可查看结果。
 
 自动服务会监听退出事件，为后续兼容更新应用补丁；每 10 秒的兜底检查用于补充遗漏事件，不会让直接重启命令等待。如果手动重开恰好撞上正在修改，后台会等下次退出。使用 Apply and Restart.command 可由程序完成整个顺序。
 
 - **Apply and Restart.command**：正常退出、应用一次并自动重开。
+- **Install or Update.command**：一次完成自动服务安装或更新、应用补丁和重开。
 - **Apply Once.command**：App 已退出时直接应用一次。
 - **Enable Automatic Fast.command**：开启更新后自动适配。
 - **Disable Automatic Fast.command**：停止自动适配，保留当前补丁。
@@ -42,14 +49,13 @@ cd codex-fast-switch
 npm ci --ignore-scripts
 npm run build
 node cli.cjs doctor
-node cli.cjs enable
-node cli.cjs restart
+node cli.cjs setup
 ```
 
 `doctor` 仅检查签名及代码是否可识别；`restart` 负责退出、安装和重开，`install` 用于 App 已经退出的情况。自定义路径示例：
 
 ```sh
-node cli.cjs enable --app "/path/to/Codex.app"
+node cli.cjs setup --app "/path/to/Codex.app"
 node cli.cjs status
 node cli.cjs restore
 ```
