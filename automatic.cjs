@@ -5,6 +5,7 @@ const crypto = require('node:crypto');
 const { execFileSync } = require('node:child_process');
 const transaction = require('./lib/transaction.cjs');
 const { restart: performRestart } = require('./lib/restart.cjs');
+const signing = require('./lib/signing.cjs');
 const { assertStopped, identityFiles, discoverApp, requireMac, assertRuntime } = require('./lib/platform.cjs');
 const { DEFAULT_STATE, saveJson, readJson, withLock, marker, PATCH_ID } = transaction;
 const LABEL = 'io.github.infinityf4p.codex-fast-switch';
@@ -133,7 +134,11 @@ async function enable(state = DEFAULT_STATE, app = discoverApp(), { model } = {}
   if (current && current.patchId !== PATCH_ID) throw new Error('Restore the earlier fixed-version patch before enabling automatic patching.');
   if (!current) transaction.verify(app, true);
   fs.mkdirSync(state, { recursive: true, mode: 0o700 });
-  return withLock(state, () => installAgent(state, app, model));
+  return withLock(state, () => {
+    signing.ensureIdentity(state, { expectedCertificateSha256: current?.signingCertificateSha256 ||
+      transaction.checkedRecord(state, app)?.signingCertificateSha256 });
+    return installAgent(state, app, model);
+  });
 }
 function installAgent(state, app, model) {
   stopStrayRestartJobs();
@@ -194,6 +199,8 @@ function status(state = DEFAULT_STATE) {
 async function restart(state = DEFAULT_STATE, app = discoverApp(), options = {}) {
   stopStrayRestartJobs();
   return withLock(state, async () => {
+    signing.ensureIdentity(state, { expectedCertificateSha256: marker(app)?.signingCertificateSha256 ||
+      transaction.checkedRecord(state, app)?.signingCertificateSha256 });
     const onPhase = phase => {
       saveJson(statusPath(state), { status: 'restarting', phase, checkedAt: new Date().toISOString() });
       options.onPhase?.(phase);

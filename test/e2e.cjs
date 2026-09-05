@@ -7,6 +7,7 @@ const tx = require('../lib/transaction.cjs');
 const automatic = require('../automatic.cjs');
 const { discoverApp } = require('../lib/platform.cjs');
 const { healthCheck } = require('../lib/health.cjs');
+const { cleanupSigningIdentity } = require('./signing-fixtures.cjs');
 
 async function main() {
   const origin = discoverApp(process.env.CODEX_FAST_TEST_APP);
@@ -48,6 +49,7 @@ async function main() {
     console.log(JSON.stringify(report, null, 2));
   } finally {
     assert.deepEqual(tx.fingerprint(origin), original);
+    cleanupSigningIdentity(state);
     fs.rmSync(root, { recursive: true, force: true });
   }
 }

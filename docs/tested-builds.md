@@ -1,5 +1,17 @@
 # Tested builds
 
+## 2026-09-05: persistent signing identity, 0.2.4
+
+Local verification used **26.901.41600 (7982)** on **arm64**.
+
+- Source checks and 37 core/native tests passed.
+- Nine signing integration checks passed at **11:44:19 UTC**: different builds with the same certificate decrypted the same dummy item while Keychain UI was prohibited; another certificate was rejected. Changed certificates stopped signing before target modification, missing identities were not regenerated, and temporary keychains were removed with the original search list and default restored.
+- The imported test private key was independently checked as non-extractable and sign-only, with decrypt, derive and unwrap disabled.
+- The isolated App UI test passed at **11:38:47 UTC**, including Fast/Standard request tiers, the compact control, successful activation and exact restoration of the official signature. The UI copy used a mock Keychain and a loopback API.
+- All 12 transaction and process-interruption tests passed at **11:39:41 UTC**.
+- A separate revision 3-to-4 upgrade passed at **11:40:56 UTC**, retained the pinned certificate on repeated installation, and restored the exact official signature.
+- No real Keychain item contents, user API credentials or relay were used. Migrating the installed app to a new identity still requires the user's initial macOS authorization.
+
 ## 2026-09-05: native compact control, 0.2.3
 
 Local verification used **26.901.41600 (7982)** on **arm64**.

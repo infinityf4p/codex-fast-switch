@@ -6,6 +6,7 @@ const { execFileSync, spawnSync } = require('node:child_process');
 const tx = require('../lib/transaction.cjs');
 const automatic = require('../automatic.cjs');
 const { assertStopped, discoverApp } = require('../lib/platform.cjs');
+const { cleanupSigningIdentity } = require('./signing-fixtures.cjs');
 const stubCheck = async () => ({ passed: true, testStub: true });
 const results = [];
 async function main() {
@@ -79,6 +80,6 @@ async function main() {
     console.log(JSON.stringify({ testedAt: new Date().toISOString(),
       tests: results, faultInjection: true, healthChecks: 'Stubbed to exercise transaction failures; actual UI verification is tested separately.',
       productionAppModified: false, serverModified: false }, null, 2));
-  } finally { fs.rmSync(root, { recursive: true, force: true }); }
+  } finally { cleanupSigningIdentity(state); fs.rmSync(root, { recursive: true, force: true }); }
 }
 main().catch(error => { console.error(error); process.exitCode = 1; });

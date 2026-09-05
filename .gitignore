@@ -1,6 +1,13 @@
 node_modules/
 dist/
 lib/native-helper
+lib/signing-helper
+signing/
+*.keychain
+*.keychain-db
+*.p12
+*.pfx
+*.pem
 .DS_Store
 *.log
 *.app/
