@@ -2,146 +2,95 @@
 
 [English](README.en.md)
 
-在使用 API Key 登录 Codex 桌面端时，启用 App 内已有的 **Standard / Fast** 切换。macOS 修改原有 App；Windows 创建本地副本。两者都可选择在 App 退出后，为兼容的新版本自动应用补丁。
+让使用 **API Key 或中转服务** 的 Codex 桌面端也能使用原生 **Standard / Fast** 开关，包括设置页和会话内的模型菜单。支持 macOS、Windows，以及 App 更新后的兼容补丁自动应用。
 
-这是独立的非官方补丁。它不提供 OAuth 身份、订阅或优先处理额度。实际速度和费用取决于 API 服务商是否支持相应模型及 `service_tier: "priority"`。
+补丁开启的是客户端已有的控件，不提供 OAuth 登录、订阅或优先处理额度。Fast 请求发送 `service_tier: "priority"`，实际速度和费用取决于模型与服务商支持。
 
-## 支持范围
+## 界面预览
 
-- **macOS** 要求 macOS 13 及以上、支持克隆的 APFS 卷；官方 App 可能要求更高版本系统。
-- **Windows** 支持 Windows 10 2004 / Windows 11 上使用 Owl 运行时的兼容客户端，自动识别 Microsoft Store 安装。Windows x64 在本机验证，ARM64 尚未实测。
-- Apple Silicon 已实测。macOS 辅助程序包含 Intel 架构，但尚未在 Intel Mac 上验证完整流程。Linux 仅运行核心测试。
-- 已验证 App **26.901.41123 (7942)** 和 **26.901.41600 (7982)**，Bundle ID 为 `com.openai.codex`。支持名为 `Codex.app` 或 `ChatGPT.app` 的对应桌面应用，不接受其他 Bundle ID 的消费版 ChatGPT。
-- 所选模型须在 App 自带目录中拥有 priority 元数据，不会自动支持服务商自定义的任意模型别名。
-- 新版本须匹配三个权限与模型函数、Fast 图标和紧凑模型选择器的完整结构。文件名、压缩变量名、空白和引号变化可以兼容；不保证适配任意未来版本。
+原生 Speed 菜单与会话模型控件，截图来自 macOS App 26.901.41600：
 
-## Windows 使用
+<img src="docs/assets/fast-speed-menu.png" alt="Codex 设置页的原生 Standard / Fast 速度菜单" width="780">
 
-下载后双击 [install.cmd](https://github.com/infinityf4p/codex-fast-switch/releases/latest/download/install.cmd) 即可安装或升级；卸载时双击 [uninstall.cmd](https://github.com/infinityf4p/codex-fast-switch/releases/latest/download/uninstall.cmd)。两个脚本均自带工具和 npm 依赖，无需解压或运行 npm 命令。
+<img src="docs/assets/fast-model-control.png" alt="实心 Fast 闪电、完整模型名和紫色 Ultra 标识" width="180">
 
-也可以像 macOS 一样用一条命令完成。在 **PowerShell** 中安装或升级：
+## 一键安装
 
-```powershell
-& { $p = Join-Path $env:TEMP 'install.cmd'; Invoke-WebRequest 'https://github.com/infinityf4p/codex-fast-switch/releases/latest/download/install.cmd' -OutFile $p -UseBasicParsing -ErrorAction Stop; & $p }
-```
+先安装官方 Codex 桌面端。以下命令用于安装或升级，会自动应用补丁、开启更新监控，并在需要时正常退出和重开 App。
 
-卸载：
+### macOS
 
-```powershell
-& { $p = Join-Path $env:TEMP 'uninstall.cmd'; Invoke-WebRequest 'https://github.com/infinityf4p/codex-fast-switch/releases/latest/download/uninstall.cmd' -OutFile $p -UseBasicParsing -ErrorAction Stop; & $p }
-```
-
-`install.cmd` 会校验内置发布包、准备本地 Fast 副本、安装或更新自动适配监控并打开 Codex。副本已经是当前版本且原版没有运行时，不会重复重启。需要退出时会唤回主窗口，核对进程与焦点后通过 **Ctrl+Q** 正常退出；若 App 等待确认，请完成确认后重试。
-
-`uninstall.cmd` 会正常退出所有本地补丁副本、停用自动适配、移除开机启动项，并删除 Fast Switch 的全部副本、后台程序、运行时、配置和日志，最后清除安装目录并尝试打开官方原版。无需保留补丁备份，重装时可从官方 App 重新生成。Codex 自身的个人配置、登录信息和会话保持不变。
-
-Windows 的 Fast UI 已同步 macOS v0.2.4：实心闪电、完整模型名、紫色 Ultra 标识和原生下拉箭头。重新运行新版脚本即可升级旧副本，无需等待官方 App 更新；已经开启的自动监控也会同步升级。本次 UI 改动尚未实测，由使用者自行验证。
-
-也可从 [Releases](https://github.com/infinityf4p/codex-fast-switch/releases) 下载 Windows ZIP，解压后双击根目录的 **install.cmd**，卸载时双击 **uninstall.cmd**。点击窗口关闭按钮可能只让 Codex 驻留托盘；手动退出时请用 Ctrl+Q 或托盘中的 Quit。
-
-之后用 **launchers/windows** 中的 **Open Codex Fast.cmd** 打开补丁版，在 **Settings > General > Speed** 中选择 Standard / Fast。原来的开始菜单图标仍打开官方原版。以下辅助脚本也在 **launchers/windows** 中；旧版发布包的辅助脚本位于解压根目录：
-
-- **Apply Once.cmd**：只准备本地副本，不启动或关闭原版。
-- **Apply and Restart.cmd**：只应用补丁并重开，不主动开启自动监控。
-- **Enable Automatic Fast.cmd**：在当前用户登录后运行监控，每 10 秒检查一次，App 退出后适配兼容更新。
-- **Disable Automatic Fast.cmd**：停止监控，保留当前副本。
-- **Restore Original App.cmd**：停用监控并清除补丁版启动目标，随后从开始菜单打开原版。
-- **Check Status.cmd**：查看副本路径、版本和最后一次操作结果。
-
-Windows 版本不会修改 `WindowsApps` 权限、商店包或系统文件关联。副本的 `ChatGPT.exe` 更新了内嵌 ASAR 校验资源，因此会变为**未签名的本地程序**；ASAR 校验仍然启用，原版签名不变。企业应用控制策略可能阻止未签名程序运行。
-
-状态和完整副本保存在 `%LOCALAPPDATA%\Codex Fast Switch`。每次兼容更新会生成新副本，可能占用数 GB；`uninstall.cmd` 会清理此安装目录。若目录中混入不属于本项目的文件或重定向路径，卸载会报告问题并保留这些内容。发布包包含 npm 依赖，不包含官方 App 或 Node，运行时取自本机 Node.js 22.12+ 或 App 自带 Node。
-
-源码运行需先执行 `npm ci --ignore-scripts` 安装依赖，再执行 `node cli.cjs doctor`、`node cli.cjs setup`；卸载使用 `node cli.cjs uninstall`。
-
-`--app "C:\path\to\app"` 可指定应用目录或 `ChatGPT.exe`。不传 `--app` 时自动跟随商店更新；显式指定的路径会保持固定。`--state PATH` 自定义状态目录后，启动、停用和恢复也要使用相同参数。更完整的实现与验证说明见 [Windows 文档](docs/windows.md)。
-
-`npm run package:windows` 会生成 `dist/install.cmd`、`dist/uninstall.cmd`、Windows ZIP 和校验文件。上传到 GitHub 最新 Release 后，在线命令才会使用这些产物；本地构建不会自动发布。Release 中的独立脚本内置依赖，源码根目录的同名脚本使用当前源码目录的依赖。
-
-## macOS 使用
-
-在终端执行一条命令，即可下载最新版并完成安装或升级：
+在终端执行：
 
 ```sh
 curl -fsSL https://github.com/infinityf4p/codex-fast-switch/releases/latest/download/install.sh | /bin/sh
 ```
 
-脚本会校验发布包的 SHA-256、安装自动补丁服务、正常退出 App、应用补丁并重开。当前补丁已经是最新版时，不会重复重启。可以先查看 [install.sh](install.sh) 的源码。
+安装后继续从原来的 App 图标启动。首次切换到本地签名时，若出现 `Codex Storage Key` 钥匙串提示，请选择“始终允许”；后续补丁复用同一张本机证书。[签名说明](docs/local-signing.md)
 
-也可从 [Releases](https://github.com/infinityf4p/codex-fast-switch/releases) 下载 macOS ZIP，解压后双击 **launchers/macos** 中的 **Install or Update.command**。其他 `.command` 辅助脚本也在该目录；旧版发布包的辅助脚本位于解压根目录。发布包含依赖和通用架构辅助程序，复用 App、旧安装或系统中的 Node 运行时，不分发官方 App 和 Node。
+### Windows
 
-安装没有固定的文件稳定等待，也不启动临时 App 做 UI 测试。重开后在 **Settings > General > Speed** 中切换。两套收起后的模型控件均使用 App 内置的实心闪电，旧补丁会通过对应原版备份自动升级。Check Status.command 可查看结果。
+在 PowerShell 执行：
 
-自动服务会监听退出事件，为后续兼容更新应用补丁；每 10 秒的兜底检查用于补充遗漏事件，不会让直接重启命令等待。如果手动重开恰好撞上正在修改，后台会等下次退出。使用 Apply and Restart.command 可由程序完成整个顺序。
+```powershell
+& { $fastInstaller = Join-Path $env:TEMP 'codex-fast-install.cmd'; Invoke-WebRequest 'https://github.com/infinityf4p/codex-fast-switch/releases/latest/download/install.cmd' -OutFile $fastInstaller -UseBasicParsing -ErrorAction Stop; & $fastInstaller }
+```
 
-- **Apply and Restart.command**：正常退出、应用一次并自动重开。
-- **Install or Update.command**：一次完成自动服务安装或更新、应用补丁和重开。
-- **Apply Once.command**：App 已退出时直接应用一次。
-- **Enable Automatic Fast.command**：开启更新后自动适配。
-- **Disable Automatic Fast.command**：停止自动适配，保留当前补丁。
-- **Restore Original App.command**：停用监控，恢复此次安装的完整原版。
+也可以直接下载并双击 [install.cmd](https://github.com/infinityf4p/codex-fast-switch/releases/latest/download/install.cmd)，无需手动解压或安装 npm 依赖。
 
-发布包未进行 Apple 公证，macOS 可能要求在“系统设置 > 隐私与安全性”中批准运行。不要全局关闭 Gatekeeper。也可以审阅源码后使用 CLI。
+Windows 会创建并打开本地补丁副本，原开始菜单图标仍打开官方原版。之后可再次运行 `install.cmd` 打开副本，或使用 ZIP 包中的 `Open Codex Fast.cmd`。退出时使用 `Ctrl+Q` 或托盘菜单的 Quit，关闭窗口可能只是最小化到托盘。
 
-### 源码安装
+## 怎么切换 Fast
 
-需要 Node.js 22.12+ 和 Xcode Command Line Tools（`xcode-select --install`）。
+| 操作位置 | 生效范围 |
+| --- | --- |
+| Settings > General > Speed | 设置新会话的默认速度，已有会话保持原选择 |
+| 当前会话的模型菜单 | 开关该会话的 Fast，下一条消息生效，其他会话不受影响 |
+| 回复正在生成时切换 | 已提交的请求保持原档位，下一条消息使用新选择 |
+
+部分版本的会话内开关显示为 **More usage**。关闭 Fast 后，请求省略 `service_tier`，由服务商的默认策略决定处理档位。
+
+上述会话行为依据 2026-09-05 的 Windows App **26.901.41600 (7982)**、补丁 revision 2、`gpt-6-astra` 九次普通回复测试，包括一次生成中切换；尚未覆盖工具调用回合中的后续模型请求，也不代表速度或计费保证。
+
+## 其他安装方式
+
+从 [Releases](https://github.com/infinityf4p/codex-fast-switch/releases/latest) 下载对应平台的 ZIP，解压后运行：
+
+- **macOS：** `Install or Update.command`。
+- **Windows：** 根目录的 `install.cmd`。
+
+辅助脚本位于 `launchers/macos` 或 `launchers/windows`；旧版发布包放在根目录。`Apply and Restart` 用于单次应用并重开，`Check Status` 查看状态，`Disable Automatic Fast` 停止自动监控并保留已安装的补丁。
+
+## 源码安装与编译
+
+需要 Git、Node.js **22.12+**。macOS 还需 Xcode Command Line Tools（`xcode-select --install`）；Windows 无需另外安装编译器。
 
 ```sh
 git clone https://github.com/infinityf4p/codex-fast-switch.git
 cd codex-fast-switch
 npm ci --ignore-scripts
 npm run build
-node cli.cjs doctor
 node cli.cjs setup
 ```
 
-`doctor` 仅检查签名及代码是否可识别；`restart` 负责退出、安装和重开，`install` 用于 App 已经退出的情况。自定义路径示例：
+`node cli.cjs doctor` 只检查兼容性，`node cli.cjs status` 查看状态。自定义安装位置可使用 `node cli.cjs setup --app "应用路径"`。
 
-```sh
-node cli.cjs setup --app "/path/to/Codex.app"
-node cli.cjs status
-node cli.cjs restore
-```
-
-`--state PATH` 可指定备份目录，之后查看、停用和恢复也要使用同一参数。每个 macOS 用户只支持一个自动服务。旧版 `--model` 参数保留兼容，但安装过程已不再测试模型。
-
-当前用户须有权限写入 App 的父目录。App 和备份目录须处于同一文件系统，以便原子交换；安装器不会自动提权或修改所有者。
-
-## 修改与回退
-
-安装器先校验原版签名、Bundle ID 和签名团队，再唯一匹配三个完整函数及 Fast 图标，校验变换后的结构，检查 12 组登录、策略和加载状态。旧版收起控件复用 App 内置的实心图标。已有的 `fast_mode = false` 限制仍然有效。
-
-随后克隆完整 App，修改归档、重算完整性校验并进行本地签名。确认原版仍已退出且未被更新器替换后，交换完整 App 并保留原版备份。
-
-安装不会访问中转站或发送模型请求。开发者可以单独运行本机 mock UI 测试，检查 Fast 请求携带 `priority`、Standard 新任务省略该参数；此测试与安装分开，也不能证明真实 TPS 提升。详见 [验证说明](docs/validation.md)。
-
-识别或修改失败会保留当前原版；交换后失败会尝试恢复**同一版本**的原版。直接重启命令会在失败后重新打开保留或恢复的 App；恢复尚未完成时会保留退出状态并报告错误。进程中断可在后续检查恢复。退出采用正常 macOS 请求，不会强制终止；退出被取消时不修改 App。失败构建不会自动反复尝试，文件变化、重新启用或显式运行重启命令可触发重试。
-
-## 签名与备份
-
-补丁使用 **ad-hoc 签名**，替换原版的根签名，去掉受限 Apple 权限并关闭库验证。这可能影响钥匙串、推送、App Groups、系统权限和后续更新。当前仅验证了启动与 Speed 流程。向 OpenAI 报告问题，或遇到更新器拒绝修改版时，请先恢复原版。
-
-状态、日志、独立工作进程、复制的运行时和完整备份位于：
-
-```text
-~/Library/Application Support/Codex Fast Switch/
-~/Library/LaunchAgents/io.github.infinityf4p.codex-fast-switch.plist
-```
-
-备份会持续保留，多次更新可能占用数 GB。删除状态目录前先恢复原版并停用服务；App 仍被修改时不要删除当前原版备份。早期私用版 Codex Fast Patch 需先使用原来的安装包恢复，再迁移到本项目。
-
-## 开发
-
-共享补丁逻辑和 Fast UI 规则位于 `src/core`，两端实现位于 `src/platforms/macos` 和 `src/platforms/windows`。辅助启动脚本在 `launchers`，开发工具在 `scripts`，测试按 `test/unit`、`test/integration` 和 `test/support` 分类。编译产物放在 `build/macos`，发布产物放在 `dist`，均不提交到 Git。
+检查、测试和生成当前平台的发布包：
 
 ```sh
 npm run check
-npm run build    # macOS 编译辅助程序；Windows 检查脚本
 npm test
-npm run package  # 为当前平台生成发布产物
+npm run package
 ```
 
-开发命令需在已安装依赖的源码目录运行。打包每次重建暂存目录，只包含共享运行代码、对应平台、启动脚本、依赖和文档。发布包不包含测试工具和另一平台的实现。后台程序与发布包共用 `src/core/runtime.cjs` 中的文件清单。可选集成验证见 [验证说明](docs/validation.md) 和 [Windows 验证](docs/windows.md#validation)，历史结果见 [tested-builds.md](docs/tested-builds.md)。CI 不下载或运行官方 App。
+## 恢复与支持范围
 
-项目不会下载适配规则或自行更新补丁程序。官方代码发生实质变化时，需要发布经过审阅的新规则。返回 `busy` 表示已有操作持锁，请等待完成后再试。源码采用 MIT 协议，依赖保留各自许可。本项目与 OpenAI 无隶属关系。
+- **macOS：** 退出 App 后运行 `Restore Original App.command`，或在源码目录执行 `node cli.cjs restore`，停用监控并恢复原版。不要提前删除原版备份或本地签名文件。
+- **Windows：** 下载并运行 [uninstall.cmd](https://github.com/infinityf4p/codex-fast-switch/releases/latest/download/uninstall.cmd)，或执行 `node cli.cjs uninstall`，移除补丁副本与监控，保留 Codex 的个人配置和会话。
+- macOS 要求 13+ 和支持克隆的 APFS；Windows 要求 Windows 10 2004+ / 11 及兼容的 Owl 客户端。官方 App 自身的系统要求仍然适用。已实测 Apple Silicon 和 Windows x64，Intel Mac、Windows ARM64 尚未验证，Linux 不支持安装。
+- 后续 App 更新在退出后自动适配；无法识别的新版本会停止修改并报告问题，需要更新本项目。不保证兼容所有未来版本。
+- macOS 使用本地证书重签名，Windows 副本是未签名程序，可能受到系统权限或应用控制策略限制。安装过程不调用模型 API，也不修改中转站配置。
+
+更多说明：[Windows](docs/windows.md) · [验证方式](docs/validation.md) · [测试记录](docs/tested-builds.md) · [安全说明](SECURITY.md)。
+
+本项目由 infinityf4p 维护，采用 [MIT](LICENSE) 协议，与 OpenAI 无隶属关系。[第三方许可](THIRD_PARTY_NOTICES.md)
