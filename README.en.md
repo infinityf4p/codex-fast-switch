@@ -83,13 +83,45 @@ npm test
 npm run package
 ```
 
-## Restore and Compatibility
+## Uninstall
 
-- **macOS:** Quit the app, then run `Restore Original App.command` or `node cli.cjs restore` from the source checkout to stop monitoring and restore the original. Keep the original backup and local signing files until restoration.
-- **Windows:** Download and run [uninstall.cmd](https://github.com/infinityf4p/codex-fast-switch/releases/latest/download/uninstall.cmd), or use `node cli.cjs uninstall`, to remove patched copies and monitoring while preserving Codex's personal settings and conversations.
-- macOS requires 13+ and APFS clone support; Windows requires Windows 10 2004+ / 11 and a compatible Owl client. The official app's own requirements still apply. Apple Silicon and Windows x64 have been tested; Intel Mac and Windows ARM64 are unverified. Linux installation is unsupported.
-- Compatible app updates are patched after exit. Unrecognized builds are left unmodified and reported; update this project for new support. Future compatibility is not guaranteed.
-- macOS uses a local signing certificate; Windows copies are unsigned. System permissions or application-control policies may restrict them. Installation makes no model API calls and does not change relay configuration.
+### macOS
+
+Fully quit Codex with **Command-Q**, then run in Terminal:
+
+```sh
+curl -fsSL https://github.com/infinityf4p/codex-fast-switch/releases/latest/download/uninstall.sh | /bin/sh
+```
+
+The script uses the installed recovery program to stop monitoring and restore the original app. Reopen it using the usual icon. Codex's personal settings and conversations are kept, along with patch recovery records and the local signing identity for recovery or later reinstallation. Keep the backup until restoration succeeds.
+
+ZIP users can also run `Restore Original App.command`; source users can run `node cli.cjs restore`. Use `sh uninstall.sh --state "directory"` for a custom state directory, or `--app "app path"` for a custom app location.
+
+### Windows
+
+Run in PowerShell, or download and double-click [uninstall.cmd](https://github.com/infinityf4p/codex-fast-switch/releases/latest/download/uninstall.cmd):
+
+```powershell
+& { $fastUninstaller = Join-Path $env:TEMP 'codex-fast-uninstall.cmd'; Invoke-WebRequest 'https://github.com/infinityf4p/codex-fast-switch/releases/latest/download/uninstall.cmd' -OutFile $fastUninstaller -UseBasicParsing -ErrorAction Stop; & $fastUninstaller }
+```
+
+This normally quits the patched copy and removes monitoring and patch installation files, keeping Codex's personal settings and conversations. Source users can also run `node cli.cjs uninstall`.
+
+## Supported App Versions
+
+Actual app testing recorded as of **2026-09-05**:
+
+| Platform | Tested app version | Coverage |
+| --- | --- | --- |
+| macOS Apple Silicon | **26.901.41600 (7982)** | Patch v0.2.4: Fast/Standard requests, native model control, local signing, and restoration |
+| macOS Apple Silicon | **26.901.41123 (7942)** | Patch v0.1.0: Fast/Standard requests, monitoring, and restoration |
+| Windows x64 | **26.901.41600 (7982)**, Store package **26.901.5280.0** | Local copy and Fast/Standard requests; separate existing-session switching tests on revision 2 |
+
+Compatibility is detected from the app's code structure, not a version allowlist. New builds with compatible structures can be patched automatically after exit. Unrecognized builds stop with a notification and keep or restore the official app for that version; the patch does not downgrade the app. Unlisted versions, Intel Mac, and Windows ARM64 are unverified. Future compatibility is not guaranteed. Run `node cli.cjs doctor` to check whether your installed build is recognized.
+
+System requirements: macOS 13+ with APFS clone support, or Windows 10 2004+ / 11 with the Owl client. The official app's own requirements still apply. Linux installation is unsupported. macOS uses a local signing certificate; Windows copies are unsigned and may be restricted by system permissions or application-control policies.
+
+These records apply to the patch revisions tested; documentation or layout changes do not imply a fresh app integration run. Installation and uninstall make no model API calls and do not change relay configuration.
 
 More details: [Windows](docs/windows.md), [validation](docs/validation.md), [tested builds](docs/tested-builds.md), and [security](SECURITY.md).
 

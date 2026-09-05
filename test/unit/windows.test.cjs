@@ -4,6 +4,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const os = require('node:os');
 const { spawnSync } = require('node:child_process');
+const { finished } = require('node:stream/promises');
 const asar = require('@electron/asar');
 const { NtExecutable, NtExecutableResource } = require('resedit');
 const integrity = require('../../src/platforms/windows/integrity.cjs');
@@ -71,7 +72,8 @@ async function fixture(t) {
     fs.writeFileSync(path.join(unpacked, 'package.json'), JSON.stringify({ name: 'openai-codex-electron',
       version, codexBuildNumber: version, codexBuildFlavor: 'prod', codexWindowsPackageIdentity: 'OpenAI.Codex',
       codexWindowsPackagePublisher: 'CN=50BDFD77-8903-4850-9FFE-6E8522F64D5B' }));
-    await asar.createPackage(unpacked, platform.archivePath(source));
+    // ASAR returns its output stream before the final writes have finished.
+    await finished(await asar.createPackage(unpacked, platform.archivePath(source)));
     const executable = NtExecutable.createEmpty(false, false);
     const resources = NtExecutableResource.from(executable);
     resources.replaceResourceEntryFromString('INTEGRITY', 'ELECTRONASAR', 1033,

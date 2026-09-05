@@ -83,13 +83,45 @@ npm test
 npm run package
 ```
 
-## 恢复与支持范围
+## 卸载
 
-- **macOS：** 退出 App 后运行 `Restore Original App.command`，或在源码目录执行 `node cli.cjs restore`，停用监控并恢复原版。不要提前删除原版备份或本地签名文件。
-- **Windows：** 下载并运行 [uninstall.cmd](https://github.com/infinityf4p/codex-fast-switch/releases/latest/download/uninstall.cmd)，或执行 `node cli.cjs uninstall`，移除补丁副本与监控，保留 Codex 的个人配置和会话。
-- macOS 要求 13+ 和支持克隆的 APFS；Windows 要求 Windows 10 2004+ / 11 及兼容的 Owl 客户端。官方 App 自身的系统要求仍然适用。已实测 Apple Silicon 和 Windows x64，Intel Mac、Windows ARM64 尚未验证，Linux 不支持安装。
-- 后续 App 更新在退出后自动适配；无法识别的新版本会停止修改并报告问题，需要更新本项目。不保证兼容所有未来版本。
-- macOS 使用本地证书重签名，Windows 副本是未签名程序，可能受到系统权限或应用控制策略限制。安装过程不调用模型 API，也不修改中转站配置。
+### macOS
+
+先用 **Command-Q** 完全退出 Codex，再在终端执行：
+
+```sh
+curl -fsSL https://github.com/infinityf4p/codex-fast-switch/releases/latest/download/uninstall.sh | /bin/sh
+```
+
+脚本调用已安装的恢复程序，停用自动监控并恢复原 App，随后可从原图标打开。保留 Codex 的个人配置、会话，以及补丁的恢复记录和本地签名证书，便于恢复或以后重装时复用签名。不要在恢复成功前删除备份。
+
+ZIP 安装也可运行 `Restore Original App.command`；源码安装可执行 `node cli.cjs restore`。自定义状态目录使用 `sh uninstall.sh --state "目录"`，自定义 App 使用 `--app "应用路径"`。
+
+### Windows
+
+在 PowerShell 执行，或直接下载并双击 [uninstall.cmd](https://github.com/infinityf4p/codex-fast-switch/releases/latest/download/uninstall.cmd)：
+
+```powershell
+& { $fastUninstaller = Join-Path $env:TEMP 'codex-fast-uninstall.cmd'; Invoke-WebRequest 'https://github.com/infinityf4p/codex-fast-switch/releases/latest/download/uninstall.cmd' -OutFile $fastUninstaller -UseBasicParsing -ErrorAction Stop; & $fastUninstaller }
+```
+
+正常退出补丁副本，移除监控和补丁安装文件，保留 Codex 的个人配置和会话。源码安装也可执行 `node cli.cjs uninstall`。
+
+## App 版本支持
+
+截至 **2026-09-05** 的实际 App 测试记录：
+
+| 平台 | 已测试的 App 版本 | 验证范围 |
+| --- | --- | --- |
+| macOS Apple Silicon | **26.901.41600 (7982)** | 补丁 v0.2.4：Fast/Standard 请求、原生模型控件、本地签名和恢复原版 |
+| macOS Apple Silicon | **26.901.41123 (7942)** | 补丁 v0.1.0：Fast/Standard 请求、自动监控和恢复原版 |
+| Windows x64 | **26.901.41600 (7982)**，Store 包 **26.901.5280.0** | 本地副本、Fast/Standard 请求；revision 2 另有已有会话切换测试 |
+
+补丁按 App 内部代码结构识别兼容性，不是只允许表内版本。结构仍兼容的新版本可在退出 App 后自动应用；无法识别时停止修改并提示，保留或恢复该版本的官方原版，不会为打补丁降级 App。表外版本、Intel Mac 和 Windows ARM64 尚未实测，不保证所有未来版本都可用。可运行 `node cli.cjs doctor` 检查本机版本是否可识别。
+
+系统要求：macOS 13+ 和支持克隆的 APFS；Windows 10 2004+ / 11 及 Owl 客户端。官方 App 自身的系统要求仍然适用，Linux 不支持安装。macOS 使用本地证书重签名，Windows 副本是未签名程序，可能受到系统权限或应用控制策略限制。
+
+以上为对应补丁版本的测试记录，不代表每次文档或目录调整都重新完成了 App 集成测试。安装和卸载不调用模型 API，也不修改中转站配置。
 
 更多说明：[Windows](docs/windows.md) · [验证方式](docs/validation.md) · [测试记录](docs/tested-builds.md) · [安全说明](SECURITY.md)。
 

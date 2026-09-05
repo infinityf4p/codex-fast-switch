@@ -4,7 +4,7 @@ const { root, copyRuntime } = require('../src/core/runtime.cjs');
 
 const documents = ['README.md', 'README.en.md', 'docs', 'SECURITY.md', 'CHANGELOG.md'];
 const launchers = {
-  darwin: ['install.sh', 'launchers/macos'],
+  darwin: ['install.sh', 'uninstall.sh', 'launchers/macos'],
   win32: ['install.cmd', 'uninstall.cmd', 'launchers/windows'],
 };
 

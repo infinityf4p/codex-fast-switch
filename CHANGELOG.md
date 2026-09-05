@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Add a macOS one-command uninstaller that uses the installed recovery CLI, stops monitoring and restores the original app while retaining personal data, recovery records and the local signing identity.
+- Separate uninstall instructions and app-version compatibility in both READMEs.
 - Organize shared code under src/core and platform implementations under src/platforms; group auxiliary launchers, unit tests, integration flows and test support separately.
 - Keep the root CLI and one-click install/uninstall entry points stable, recognize legacy Windows Startup paths during upgrades and uninstall, and track worker layout separately from app patch revisions.
 - Share a runtime file list between installed workers and release packaging, rebuild clean staging directories, and keep development tools, tests and the other platform out of release packages. macOS helper binaries now live under build/macos.
