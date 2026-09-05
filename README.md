@@ -8,9 +8,11 @@
 
 ## 界面预览
 
-原生 Speed 菜单与会话模型控件，截图来自 macOS App 26.901.41600：
+原生 Speed 菜单、展开的模型与推理强度菜单，以及收起后的会话模型控件：
 
 <img src="docs/assets/fast-speed-menu.png" alt="Codex 设置页的原生 Standard / Fast 速度菜单" width="780">
+
+<img src="docs/assets/fast-model-menu.png" alt="展开的会话模型菜单：6 Astra、Ultra 推理强度、Fast 开关和推理强度滑块" width="245">
 
 <img src="docs/assets/fast-model-control.png" alt="实心 Fast 闪电、完整模型名和紫色 Ultra 标识" width="180">
 

@@ -8,9 +8,11 @@ The patch exposes controls already in the app. It does not provide OAuth access,
 
 ## Preview
 
-The native Speed menu and conversation model control, captured on macOS app 26.901.41600:
+Native Speed settings, expanded model and reasoning controls, and the collapsed conversation model picker:
 
 <img src="docs/assets/fast-speed-menu.png" alt="Codex settings with the native Standard / Fast speed menu" width="780">
+
+<img src="docs/assets/fast-model-menu.png" alt="Expanded conversation model menu with 6 Astra, Ultra reasoning effort, a Fast toggle, and an effort slider" width="245">
 
 <img src="docs/assets/fast-model-control.png" alt="Filled Fast lightning icon, full model name, and purple Ultra label" width="180">
 
