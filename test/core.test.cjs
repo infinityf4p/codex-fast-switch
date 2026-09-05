@@ -177,7 +177,7 @@ test('probe environment strips credentials, provider overrides, proxies and Node
     OPENAI_BASE_URL: 'https://external.invalid', HTTPS_PROXY: 'https://external.invalid', NODE_OPTIONS: '--require unwanted', AWS_ACCESS_KEY_ID: 'sensitive' });
   for (const name of ['OPENAI_API_KEY', 'OPENAI_BASE_URL', 'HTTPS_PROXY', 'NODE_OPTIONS', 'AWS_ACCESS_KEY_ID']) assert.equal(env[name], undefined);
   assert.equal(env.HOME, '/temporary');
-  assert.equal(env.CODEX_HOME, '/temporary/codex');
+  assert.equal(env.CODEX_HOME, path.join('/temporary', 'codex'));
   assert.match(probeConfig(4567, 'example-model'), /http:\/\/127\.0\.0\.1:4567/);
   assert.match(probeConfig(4567), /cli_auth_credentials_store = "file"/);
   assert.throws(() => probeConfig(4567, 'bad"\nbase_url="external'), /Invalid verification model/);

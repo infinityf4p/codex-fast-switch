@@ -17,7 +17,7 @@ test('local identity requirement binds both the certificate and exact app identi
   }
 });
 
-test('an incomplete or substituted signing identity is refused without creating replacement files', () => {
+test('an incomplete or substituted signing identity is refused without creating replacement files', { skip: process.platform === 'win32' }, () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'codex-signing-record-'));
   const directory = path.join(root, 'signing');
   fs.mkdirSync(directory, { mode: 0o700 });

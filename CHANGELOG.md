@@ -1,5 +1,20 @@
 # Changelog
 
+## Unreleased
+
+- Rename the standalone Windows installer to install.cmd and add uninstall.cmd, with matching download links and one-command PowerShell entries in both READMEs.
+- Combine Windows installation, monitor setup and app launch; avoid restarting a current local copy unnecessarily.
+- Add complete Windows uninstall: normal Quit, Startup removal, worker shutdown, owned-file cleanup and return to the original app. Preserve Codex's personal profile. These changes have not been tested locally.
+- Sync the Windows Fast UI with macOS v0.2.4: filled Fast glyph, full model names, purple Ultra effort and native compact picker spacing and chevron.
+- Track Windows patch revisions so the updated installer upgrades existing copies and enabled monitors without requiring an official app update. This UI revision has not been tested locally.
+- Add Windows Owl runtime support with automatic Store discovery, local app copies, normal close/reopen, and double-click commands.
+- Add a standalone one-click Windows script with an embedded, hash-checked package and automatic temporary extraction.
+- Fix Windows restart timeouts caused by close-to-tray behavior: restore the same application profile and invoke Ctrl+Q after process and focus checks. Record failed operation details for diagnosis.
+- Update the Windows PE integrity resource through resedit, preserve other resources and executable sections, and remove the copy's invalid Authenticode signature.
+- Keep the original Store installation unchanged; publish complete local generations through an atomic launch-target record.
+- Add optional per-user Startup monitoring, Windows packaging and CI, interruption tests, and an isolated Windows UI probe.
+- Fix Windows ASAR entry separators and directory-fsync incompatibility in shared core code.
+
 ## 0.2.4
 
 - Keep a persistent local signing identity so subsequent patches retain the same Keychain identity instead of changing with each ad-hoc signature.

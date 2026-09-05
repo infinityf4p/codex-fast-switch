@@ -2,21 +2,54 @@
 
 [简体中文](README.zh-CN.md)
 
-Enable the existing **Standard / Fast** control in the Codex desktop app when using API-key authentication. Keep opening the usual app icon. An optional macOS LaunchAgent reapplies compatible patches after app updates, while the app is closed.
+Enable the existing **Standard / Fast** control in the Codex desktop app when using API-key authentication. macOS patches the existing app. Windows prepares a local copy and opens it with **Open Codex Fast.cmd**. Optional per-user monitoring reapplies compatible patches after app updates, while the app is closed.
 
 This is an independent, unofficial patch. It does not provide OAuth access, priority capacity, or a subscription. Your API provider must support the requested model and `service_tier: "priority"`; speed and pricing depend on that provider.
 
 ## Compatibility
 
-- **macOS only**, macOS 13 or newer and an APFS volume with clone support. The official app may require a newer OS.
-- Apple Silicon has been tested. The helper also builds for Intel; Intel end-to-end behavior is unverified. Patching is unsupported on Windows and Linux; CI also exercises the portable core on Linux.
-- The current patch is verified on **26.901.41600 (7982)**, bundle ID `com.openai.codex`. Earlier releases also tested **26.901.41123 (7942)**. It can be named `Codex.app` or `ChatGPT.app`; a consumer ChatGPT bundle with a different ID is rejected.
+- **macOS:** macOS 13 or newer and an APFS volume with clone support. The official app may require a newer OS.
+- **Windows:** Windows 10 2004 / Windows 11 and a supported Codex Owl runtime. Microsoft Store installations are discovered automatically. The Windows build uses a writable local copy and leaves WindowsApps and package registration unchanged. See [Windows details](docs/windows.md).
+- Apple Silicon has been tested. The macOS helper also builds for Intel; Intel end-to-end behavior is unverified. Windows x64 is tested locally; Windows ARM64 is unverified. Linux runs core tests only.
+- Verified apps: **26.901.41123 (7942)** and **26.901.41600 (7982)**, bundle ID `com.openai.codex`. It can be named `Codex.app` or `ChatGPT.app`; a consumer ChatGPT bundle with a different ID is rejected.
 - The selected model must have priority metadata in the app's built-in catalog. Arbitrary provider aliases are not automatically supported.
-- New builds are accepted when all three complete function structures and the Fast icon components remain recognizable. Changed filenames, identifier names, whitespace and quote styles can be tolerated. Arbitrary future updates are not guaranteed.
+- New builds are accepted when the three gate/model functions, Fast glyph and compact picker layouts remain recognizable. Changed filenames, identifier names, whitespace and quote styles can be tolerated. Arbitrary future updates are not guaranteed.
 
-## Install
+## Install on Windows
 
-Run this command to download and install or update the latest release:
+Download and double-click [install.cmd](https://github.com/infinityf4p/codex-fast-switch/releases/latest/download/install.cmd) to install or update. Use [uninstall.cmd](https://github.com/infinityf4p/codex-fast-switch/releases/latest/download/uninstall.cmd) to uninstall. Both standalone scripts include the tools and npm dependencies, with no manual extraction or npm command required.
+
+Alternatively, install or update with one command in **PowerShell**:
+
+```powershell
+& { $p = Join-Path $env:TEMP 'install.cmd'; Invoke-WebRequest 'https://github.com/infinityf4p/codex-fast-switch/releases/latest/download/install.cmd' -OutFile $p -UseBasicParsing -ErrorAction Stop; & $p }
+```
+
+Uninstall:
+
+```powershell
+& { $p = Join-Path $env:TEMP 'uninstall.cmd'; Invoke-WebRequest 'https://github.com/infinityf4p/codex-fast-switch/releases/latest/download/uninstall.cmd' -OutFile $p -UseBasicParsing -ErrorAction Stop; & $p }
+```
+
+`install.cmd` checks its embedded package, prepares the local Fast copy, installs or updates automatic monitoring, and opens Codex. A current copy is not restarted when the original app is closed. When a restart is needed, it restores the main window, checks its process and focus, and quits normally with **Ctrl+Q**. Complete any pending app confirmation before retrying.
+
+`uninstall.cmd` quits all local Fast copies normally, disables monitoring, removes its Startup entry, and deletes every Fast Switch copy, worker, copied runtime, configuration file and log. It removes the installation directory and attempts to open the official app. Patch backups are unnecessary because reinstalling creates a fresh copy from the official app. Codex's own settings, credentials and conversations are preserved. Unexpected files or redirected paths in the installation directory are reported and preserved.
+
+The Windows Fast UI now follows macOS v0.2.4: a filled Fast glyph, full model names, purple Ultra effort and a native dropdown chevron. Re-running the updated script upgrades older copies even without an official app update, and refreshes an already enabled monitor. This UI revision has not been tested locally.
+
+You can also download the Windows ZIP from [Releases](https://github.com/infinityf4p/codex-fast-switch/releases), extract it, and double-click **install.cmd** or **uninstall.cmd**. Use **Open Codex Fast.cmd** for subsequent launches, then choose **Settings > General > Speed**. A window close can leave Codex running in the tray; use Ctrl+Q or the tray's Quit command to exit manually.
+
+**Apply and Restart.cmd** applies the patch and reopens the app without enabling monitoring. **Enable Automatic Fast.cmd** adds a per-user Startup monitor with a 10-second poll. **Disable Automatic Fast.cmd** stops monitoring. **Restore Original App.cmd** disables monitoring and clears the local launch target after you exit the copy manually.
+
+The local executable becomes **unsigned** because its embedded ASAR integrity resource is updated. The archive's integrity checks remain enabled. The signed Microsoft Store installation is untouched. Windows may block unsigned executables under managed application-control policies.
+
+The ZIP includes dependencies, but no official app or Node runtime. It uses Node.js 22.12+ from the installed app or system. From a source checkout, run `npm ci --ignore-scripts`, then `node cli.cjs setup`; use `node cli.cjs uninstall` to uninstall. See [Windows usage, storage and limitations](docs/windows.md).
+
+`npm run package:windows` produces `dist/install.cmd`, `dist/uninstall.cmd`, the Windows ZIP and checksums. Upload both scripts under those exact names to the latest GitHub Release to enable the online commands. A local build does not publish them automatically.
+
+## Install on macOS
+
+Install or update the latest release with one command:
 
 ```sh
 curl -fsSL https://github.com/infinityf4p/codex-fast-switch/releases/latest/download/install.sh | /bin/sh
@@ -97,7 +130,7 @@ npm run test:launchagent   # temporary uniquely named service, removed afterward
 npm run package            # macOS release ZIP + SHA-256
 ```
 
-Set `CODEX_FAST_TEST_APP` to test a specific original bundle. Core tests use independent synthetic code, not proprietary app fixtures. CI checks the core on Linux and macOS and builds/tests the native swap helper on macOS. It does not download or launch the official app. See [tested builds](docs/tested-builds.md) for the local integration results.
+Set `CODEX_FAST_TEST_APP` to test a specific original bundle. Core tests use independent synthetic code, not proprietary app fixtures. CI checks the core on Linux, macOS and Windows, builds/tests the native swap helper on macOS, and validates the Windows ZIP. It does not download or launch the official app. See [tested builds](docs/tested-builds.md) for the local integration results.
 
 There is no rule download or patch self-update. Support for substantive new app code requires a reviewed project update. See [CONTRIBUTING.md](CONTRIBUTING.md) and [SECURITY.md](SECURITY.md). A `busy` result means another operation holds the lock; let it finish and retry.
 

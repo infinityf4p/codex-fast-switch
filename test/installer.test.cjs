@@ -5,7 +5,7 @@ const path = require('node:path');
 const os = require('node:os');
 const vm = require('node:vm');
 const crypto = require('node:crypto');
-const shell = fs.readFileSync(path.join(__dirname, '../install.sh'), 'utf8');
+const shell = fs.readFileSync(path.join(__dirname, '../install.sh'), 'utf8').replace(/\r\n/g, '\n');
 const source = shell.split("<<'NODE'\n")[1].split('\nNODE\n')[0];
 
 function runInstaller(t, { corrupt = false, unexpectedUrl = false } = {}) {

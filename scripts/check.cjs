@@ -8,9 +8,14 @@ function check(directory) {
     const file = path.join(directory, entry.name);
     if (entry.isDirectory()) check(file);
     else if (file.endsWith('.cjs')) execFileSync(process.execPath, ['--check', file], { stdio: 'inherit' });
-    else if (file.endsWith('.sh')) execFileSync('/bin/sh', ['-n', file], { stdio: 'inherit' });
+    else if (file.endsWith('.sh') && process.platform !== 'win32') execFileSync('/bin/sh', ['-n', file], { stdio: 'inherit' });
     else if (file.endsWith('.json')) JSON.parse(fs.readFileSync(file, 'utf8'));
   }
 }
 check(root);
+if (process.platform === 'win32') {
+  const powershell = path.join(process.env.SystemRoot || 'C:\\Windows', 'System32/WindowsPowerShell/v1.0/powershell.exe');
+  execFileSync(powershell, ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File',
+    path.join(__dirname, 'check-windows.ps1'), '-Root', root], { stdio: 'inherit', windowsHide: true });
+}
 console.log('Source syntax and JSON checks passed.');

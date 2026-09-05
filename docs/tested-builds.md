@@ -1,5 +1,29 @@
 # Tested builds
 
+## 2026-09-05: Windows install and uninstall scripts, not tested
+
+The standalone Windows scripts are now `install.cmd` and `uninstall.cmd`. Setup enables monitoring and opens the copy; uninstall removes all Fast Switch installation files after normal Quit and worker shutdown, while retaining Codex's own profile. README download commands and packaging were updated. At the user's request, the scripts, cleanup logic and installation flows were not executed for testing.
+
+## 2026-09-05: Windows Fast UI synchronization, not tested
+
+Windows patch revision 2 imports the Fast glyph and compact model control from macOS v0.2.4 (`87060bb`), with the UI introduced by v0.2.1 and v0.2.3. It also upgrades previous Windows copies and enabled monitor code when the official app is unchanged. At the user's request, no tests, compatibility probe or app launch were run for this revision. The results and Speed screenshot recorded below apply to the earlier Windows implementation.
+
+## 2026-09-05: Windows local-copy support
+
+Local verification used Windows x64, Store package **26.901.5280.0**, app **26.901.41600 (7982)** with the Owl runtime.
+
+- Core tests: **39 passed**, with the two macOS-only tests skipped. Includes the Windows PowerShell 5.1 launcher, profile-argument preservation, failure recording, synthetic PE resources and child-process interruption before publication.
+- The initial Windows restart used `CloseMainWindow`, which left Codex running in the tray and timed out. The corrected flow uses the application's Ctrl+Q Quit command. A local test reproduced window-close-to-tray behavior, reactivated the same isolated profile and exited successfully with code 0. Direct Quit also passed, and the original app's processes remained running.
+- The standalone one-click script was tested with spaces, Unicode and ampersands in its path. Normal invocation delegates to restart; help mode, exit-code propagation, temporary cleanup, payload corruption and archive traversal rejection passed using a harmless fixture launcher.
+- JavaScript, JSON and Windows PowerShell syntax checks passed.
+- Store discovery and OpenAI Authenticode validation passed, including a WindowsApps path redirected to another drive.
+- A complete local copy was installed. The embedded executable hash matched the patched ASAR; other PE resources and non-resource sections were preserved. The resulting local executable was unsigned, while the source signatures and recorded source hashes were unchanged.
+- The isolated UI test passed on **2026-09-05**, with the Speed menu screenshot captured at **10:33:17 UTC**: `gpt-6-astra` sent `priority` for Fast and omitted the tier for Standard. Both requests received complete loopback mock replies. Title requests also used the mock.
+- Per-user Startup monitoring, re-enabling an existing worker, waiting for the original app to exit, disabling and restoration passed. The temporary Startup shortcut was removed and the original app remained running and unchanged.
+- The UI harness uses a temporary Windows profile layout, ignores the avatar-overlay page, and selects read-only / unelevated sandbox configuration. No administrator sandbox initialization was performed. Normal app background initialization and plugin/runtime downloads can still occur.
+
+No personal API credentials were used. This verifies request selection, not actual provider throughput. Windows ARM64, managed application-control policies, original Store file associations and all package-specific integrations remain unverified. CI has been configured for Windows; hosted CI was not run as part of this local verification.
+
 ## 2026-09-05: persistent signing identity, 0.2.4
 
 Local verification used **26.901.41600 (7982)** on **arm64**.

@@ -2,6 +2,11 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { execFileSync } = require('node:child_process');
 const { requireMac } = require('../lib/platform.cjs');
+if (process.platform === 'win32') {
+  execFileSync(process.execPath, [path.join(__dirname, 'check.cjs')], { stdio: 'inherit' });
+  console.log('Windows scripts are ready; no compiler is required.');
+  process.exit(0);
+}
 requireMac();
 const root = path.join(__dirname, '..');
 execFileSync('/usr/bin/xcrun', ['clang', '-O2', '-fobjc-arc', '-arch', 'arm64', '-arch', 'x86_64',

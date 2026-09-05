@@ -7,6 +7,8 @@ This project's original source is MIT licensed. Release archives include npm dep
 | @electron/asar | MIT |
 | acorn | MIT |
 | acorn-walk | MIT |
+| resedit | MIT |
+| pe-library | MIT |
 | @xmldom/xmldom | MIT |
 | base64-js | MIT |
 | plist | MIT |
