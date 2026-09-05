@@ -23,7 +23,13 @@ async function main() {
     const options = { now: start, notifyUser: message => console.log(JSON.stringify({ notice: message })),
       install: (target, stateDir) => tx.install(target, stateDir, {
         check: (candidate, options) => healthCheck(candidate, { ...options,
-          screenshot: process.env.CODEX_FAST_TEST_SCREENSHOT }),
+          screenshot: process.env.CODEX_FAST_TEST_SCREENSHOT,
+          model: process.env.CODEX_FAST_TEST_MODEL,
+          reasoningEffort: process.env.CODEX_FAST_TEST_REASONING_EFFORT,
+          modelLabel: process.env.CODEX_FAST_TEST_MODEL_LABEL,
+          verifyCompactControl: process.env.CODEX_FAST_TEST_COMPACT_UI === '1',
+          compactScreenshot: process.env.CODEX_FAST_TEST_COMPACT_SCREENSHOT,
+          colorScheme: process.env.CODEX_FAST_TEST_COLOR_SCHEME }),
         onPhase: (phase, detail) => console.log(JSON.stringify({ phase, detail })),
       }) };
     const installed = await automatic.tick(state, options);

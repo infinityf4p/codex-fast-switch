@@ -10,11 +10,15 @@ Acorn parses packed JavaScript under `webview/`. Each entire target function mus
 
 The legacy Fast icon and the bundled filled icon also require reviewed component fingerprints. Only the SVG path and viewBox are copied; the original component's dimensions, props and initialization remain intact. The repository contains icon fingerprints and synthetic tests, not extracted official SVG paths. Older patch revisions are restored to their matching original before applying the current revision; a newer revision is never downgraded.
 
+Both compact model control variants require reviewed original and transformed function fingerprints. The patch changes presentation properties and reuses the bundled model-label style and chevron. Model selection, reasoning effort, service-tier eligibility and menu behavior remain dynamic.
+
 The installer clones the bundle, updates ASAR integrity, signs locally, and exchanges complete bundles while retaining the original. It checks the file identity during exchange to avoid overwriting an unrelated update. It has no fixed stability timer and does not launch a test app or call a model API.
 
 ## Optional developer UI test
 
 `npm run test:e2e` explicitly adds UI verification on a temporary copy. This is not run by install, restart or automatic monitoring. The app copy uses a temporary HOME, CODEX_HOME, working directory and Electron profile. The child environment excludes API credentials, Node injection options, proxy settings and inherited provider overrides. Auth is file-based with a dummy local key. Model discovery uses the bundled backend's `model/list` protocol and requires reported `priority` capability. It does not read the user's real model configuration.
+
+On macOS, the disposable test copy uses Chromium's `--use-mock-keychain` developer flag. This flag is not used when launching the installed app. Optional compact-control checks inspect the idle layout and can capture a cropped screenshot with a specified test model and reasoning effort.
 
 The test uses CDP over inherited pipes, not a listening debugging port. CDP reads DOM state and dispatches normal mouse/keyboard input; it does not inject a patch into the renderer. English onboarding and Settings are currently expected. A changed layout, locale override or missing control fails this optional test; installation does not depend on the test layout.
 

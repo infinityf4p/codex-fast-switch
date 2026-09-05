@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.2.3
+
+- Match the native compact model control with full model names, a filled Fast icon, purple Ultra effort and a dropdown chevron.
+- Preserve the selected model, effort and service tier across both compact control variants.
+
 ## 0.2.2
 
 - Add an online one-command installer that downloads the latest release and checks its SHA-256 digest.
