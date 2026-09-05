@@ -10,15 +10,17 @@ This is an independent, unofficial patch. It does not provide OAuth access, prio
 
 - **macOS only**, macOS 13 or newer and an APFS volume with clone support. The official app may require a newer OS.
 - Apple Silicon has been tested. The helper also builds for Intel; Intel end-to-end behavior is unverified. Patching is unsupported on Windows and Linux; CI also exercises the portable core on Linux.
-- Verified apps: **26.901.41123 (7942)** and **26.901.41600 (7982)**, bundle ID `com.openai.codex`. It can be named `Codex.app` or `ChatGPT.app`; a consumer ChatGPT bundle with a different ID is rejected.
+- The current patch is verified on **26.901.41600 (7982)**, bundle ID `com.openai.codex`. Earlier releases also tested **26.901.41123 (7942)**. It can be named `Codex.app` or `ChatGPT.app`; a consumer ChatGPT bundle with a different ID is rejected.
 - The selected model must have priority metadata in the app's built-in catalog. Arbitrary provider aliases are not automatically supported.
-- New builds are accepted when all three complete function structures remain recognizable. Changed filenames, identifier names, whitespace and quote styles can be tolerated. Arbitrary future updates are not guaranteed.
+- New builds are accepted when all three complete function structures and the Fast icon components remain recognizable. Changed filenames, identifier names, whitespace and quote styles can be tolerated. Arbitrary future updates are not guaranteed.
 
 ## Install
 
 Download the macOS ZIP from [Releases](https://github.com/infinityf4p/codex-fast-switch/releases), unzip it, and run **Enable Automatic Fast.command**. The package contains dependencies and a universal native helper. It uses a suitable Node runtime from your installed app or system; Node itself and the official app are not redistributed.
 
 Run **Apply and Restart.command** to apply now. It requests a normal quit, patches the app, and opens it again automatically. There is no fixed stability delay and no temporary-app UI test during installation. Use **Settings > General > Speed** after it reopens. Check Status.command shows the result.
+
+Fast uses the app's bundled filled lightning glyph in both collapsed model controls. To upgrade an older patch, run Enable Automatic Fast.command from the new package, then Apply and Restart.command. The installer restores the matching original backup and applies the new revision automatically.
 
 The automatic monitor listens for app exit events and applies compatible patches after future updates. A 10-second fallback poll covers missed events; it does not impose a delay on the restart command. If you manually reopen while a patch is being made, the monitor waits for another exit. Apply and Restart.command coordinates the entire sequence.
 
@@ -55,7 +57,7 @@ The current user must be able to write to the app's parent directory. The app an
 ## Patching and recovery
 
 1. Verify the original app's full code signature against the expected bundle ID and OpenAI signing team.
-2. Find three unique whole-function AST fingerprints and verify the transformed fingerprints. Existing `fast_mode = false` policy restrictions remain effective.
+2. Find three unique whole-function AST fingerprints and the Fast icon fingerprints, then verify the transformed structures. Reuse the app's bundled filled glyph for the legacy collapsed control. Existing `fast_mode = false` policy restrictions remain effective.
 3. Exercise API-key, ChatGPT and absent authentication across blocked/loading states: 12 cases, each checked against both UI and request gates.
 4. Clone the complete app, patch the archive with integrity hashes, and sign the copy locally.
 5. Confirm the original is still closed and unchanged, then atomically exchange complete bundles and retain the original backup.

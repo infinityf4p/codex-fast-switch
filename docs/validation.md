@@ -8,6 +8,8 @@ The original app passes `codesign --verify --deep --strict` with an inline requi
 
 Acorn parses packed JavaScript under `webview/`. Each entire target function must match a bundled fingerprint. Normalization removes locations and normalizes identifier spelling and literal quote style. It keeps operators, control flow, property names and values. Duplicate or missing targets are rejected. The transformed functions must match separate reviewed hashes. Isolated VM tests verify API-key and ChatGPT eligibility, absent authentication, loading state and `fast_mode = false` restrictions.
 
+The legacy Fast icon and the bundled filled icon also require reviewed component fingerprints. Only the SVG path and viewBox are copied; the original component's dimensions, props and initialization remain intact. The repository contains icon fingerprints and synthetic tests, not extracted official SVG paths. Older patch revisions are restored to their matching original before applying the current revision; a newer revision is never downgraded.
+
 The installer clones the bundle, updates ASAR integrity, signs locally, and exchanges complete bundles while retaining the original. It checks the file identity during exchange to avoid overwriting an unrelated update. It has no fixed stability timer and does not launch a test app or call a model API.
 
 ## Optional developer UI test
