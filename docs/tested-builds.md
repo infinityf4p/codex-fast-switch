@@ -1,5 +1,13 @@
 # Tested builds
 
+## 2026-09-05: reported existing-session Fast switching, Windows revision 2
+
+The supplied test report covers Windows app **26.901.41600 (7982)**, patch revision **2**, and `gpt-6-astra`, tested at **23:06-23:10 Asia/Shanghai**. An isolated app copy, profile and Codex home used a dummy key and a loopback Responses server. All nine ordinary conversation replies completed across two fixed thread IDs; two title requests were excluded.
+
+Global Speed changes affected new conversations. Each existing conversation retained its own setting until changed in its model menu. Fast sent `priority`; Standard omitted the tier. A switch during one held stream left that submitted request unchanged, while the next message used the new choice. Another conversation completed a reply during the held stream.
+
+This is a reported app test, not a rerun during the README update. Provider throughput, billing, and follow-up model calls within a tool-using turn were not tested. The raw request JSON referenced by the report was not supplied to this repository.
+
 ## 2026-09-05: repository layout, not tested
 
 Shared and platform code, launchers and test tools were moved into dedicated directories. CLI dispatch, worker file lists, native helper locations, packaging and Windows legacy Startup-path handling were updated. Existing test imports and commands follow the new paths. At the user's request, no tests or app installation, upgrade, launch or uninstall flows were run for this change. Earlier results below apply to the previous layout.
