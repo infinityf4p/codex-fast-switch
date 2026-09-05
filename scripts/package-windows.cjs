@@ -10,7 +10,7 @@ const name = `codex-fast-switch-${version}-windows`;
 const dist = path.join(root, 'dist');
 const stage = path.join(dist, name);
 fs.mkdirSync(stage, { recursive: true });
-for (const item of ['cli.cjs', 'automatic.cjs', 'watch.cjs', 'lib', 'windows', 'bin', 'docs', 'scripts', 'test', 'node_modules', 'package.json', 'package-lock.json',
+for (const item of ['cli.cjs', 'automatic.cjs', 'watch.cjs', 'install.sh', 'lib', 'windows', 'bin', 'docs', 'scripts', 'test', 'node_modules', 'package.json', 'package-lock.json',
   'README.md', 'README.zh-CN.md', 'LICENSE', 'THIRD_PARTY_NOTICES.md', 'SECURITY.md', 'CHANGELOG.md',
   ...fs.readdirSync(root).filter(file => file.endsWith('.cmd'))]) {
   fs.cpSync(path.join(root, item), path.join(stage, item), { recursive: true });
