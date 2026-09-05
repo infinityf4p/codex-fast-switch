@@ -14,6 +14,8 @@ Both compact model control variants require reviewed original and transformed fu
 
 The installer clones the bundle, updates ASAR integrity, signs locally, and exchanges complete bundles while retaining the original. It checks the file identity during exchange to avoid overwriting an unrelated update. It has no fixed stability timer and does not launch a test app or call a model API.
 
+From 0.2.4, signing uses a persistent local certificate and an explicit certificate-bound designated requirement. Setup prepares this identity before quitting the app. Identity loss or mismatch fails without silently replacing the certificate. [Local signing](local-signing.md) describes storage, initial Keychain authorization and the isolated authorization-reuse test.
+
 ## Optional developer UI test
 
 `npm run test:e2e` explicitly adds UI verification on a temporary copy. This is not run by install, restart or automatic monitoring. The app copy uses a temporary HOME, CODEX_HOME, working directory and Electron profile. The child environment excludes API credentials, Node injection options, proxy settings and inherited provider overrides. Auth is file-based with a dummy local key. Model discovery uses the bundled backend's `model/list` protocol and requires reported `priority` capability. It does not read the user's real model configuration.

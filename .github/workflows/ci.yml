@@ -25,3 +25,5 @@ jobs:
       - if: runner.os == 'macOS'
         run: npm run build
       - run: npm test
+      - if: runner.os == 'macOS'
+        run: npm run test:signing

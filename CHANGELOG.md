@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.4
+
+- Keep a persistent local signing identity so subsequent patches retain the same Keychain identity instead of changing with each ad-hoc signature.
+- Prepare signing before quitting the app, preserve the identity across worker updates, and refuse silent certificate replacement if its files are lost or damaged.
+- Add an isolated Keychain test proving authorization reuse across different builds and rejection of another certificate. The first migration still requires the user's macOS authorization.
+
 ## 0.2.3
 
 - Match the native compact model control with full model names, a filled Fast icon, purple Ultra effort and a dropdown chevron.

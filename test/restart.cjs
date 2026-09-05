@@ -9,6 +9,7 @@ const platform = require('../lib/platform.cjs');
 const { restart } = require('../lib/restart.cjs');
 const { probeEnvironment, probeConfig, discoverModel, stopChild } = require('../lib/probe.cjs');
 const { CdpPipe } = require('../lib/cdp.cjs');
+const { cleanupSigningIdentity } = require('./signing-fixtures.cjs');
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 async function until(fn, label) {
   const deadline = Date.now() + 20000;
@@ -48,7 +49,7 @@ async function main() {
     observer.stdout.on('data', data => { events += data; });
     await until(() => events.includes('watching'), 'exit observer startup');
     async function launch() {
-      const child = spawn(platform.binaryPath(app), ['--remote-debugging-pipe', `--user-data-dir=${path.join(root, 'profile')}`, '--lang=en-US'], {
+      const child = spawn(platform.binaryPath(app), ['--remote-debugging-pipe', `--user-data-dir=${path.join(root, 'profile')}`, '--lang=en-US', '--use-mock-keychain'], {
         cwd: root, env: probeEnvironment(root), stdio: ['ignore', 'ignore', 'ignore', 'pipe', 'pipe'],
       });
       const closed = new Promise(resolve => { child.once('exit', resolve); child.once('error', resolve); });
@@ -110,6 +111,7 @@ async function main() {
     for (const { child, closed } of children) await stopChild(child, closed);
     server.closeAllConnections();
     await new Promise(resolve => server.close(resolve));
+    cleanupSigningIdentity(state);
     fs.rmSync(root, { recursive: true, force: true, maxRetries: 3, retryDelay: 300 });
   }
 }

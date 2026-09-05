@@ -5,6 +5,15 @@ const { sha256 } = require('../lib/archive.cjs');
 const { requireMac } = require('../lib/platform.cjs');
 requireMac();
 const root = path.join(__dirname, '..');
+function rejectSigningState(directory) {
+  for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+    if (entry.name === 'signing' || ['.pem', '.key', '.p12', '.pfx', '.keychain', '.keychain-db'].includes(path.extname(entry.name))) {
+      throw new Error('Refusing to package local signing identity material.');
+    }
+    if (entry.isDirectory()) rejectSigningState(path.join(directory, entry.name));
+  }
+}
+for (const directory of ['lib', 'test']) rejectSigningState(path.join(root, directory));
 const { version } = require('../package.json');
 const name = `codex-fast-switch-${version}-macos-universal`;
 const dist = path.join(root, 'dist');
