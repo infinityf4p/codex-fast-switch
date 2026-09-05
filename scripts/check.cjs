@@ -8,6 +8,7 @@ function check(directory) {
     const file = path.join(directory, entry.name);
     if (entry.isDirectory()) check(file);
     else if (file.endsWith('.cjs')) execFileSync(process.execPath, ['--check', file], { stdio: 'inherit' });
+    else if (file.endsWith('.sh')) execFileSync('/bin/sh', ['-n', file], { stdio: 'inherit' });
     else if (file.endsWith('.json')) JSON.parse(fs.readFileSync(file, 'utf8'));
   }
 }

@@ -16,11 +16,17 @@ This is an independent, unofficial patch. It does not provide OAuth access, prio
 
 ## Install
 
-Download the macOS ZIP from [Releases](https://github.com/infinityf4p/codex-fast-switch/releases), unzip it, and run **Enable Automatic Fast.command**. The package contains dependencies and a universal native helper. It uses a suitable Node runtime from your installed app or system; Node itself and the official app are not redistributed.
+Run this command to download and install or update the latest release:
 
-Run **Apply and Restart.command** to apply now. It requests a normal quit, patches the app, and opens it again automatically. There is no fixed stability delay and no temporary-app UI test during installation. Use **Settings > General > Speed** after it reopens. Check Status.command shows the result.
+```sh
+curl -fsSL https://github.com/infinityf4p/codex-fast-switch/releases/latest/download/install.sh | /bin/sh
+```
 
-Fast uses the app's bundled filled lightning glyph in both collapsed model controls. To upgrade an older patch, run Enable Automatic Fast.command from the new package, then Apply and Restart.command. The installer restores the matching original backup and applies the new revision automatically.
+The script checks the release ZIP's SHA-256 digest, installs automatic patching, requests a normal quit, applies the patch, and reopens the app. An already current patch is left running. You can inspect [install.sh](install.sh) before running it.
+
+Alternatively, download the macOS ZIP from [Releases](https://github.com/infinityf4p/codex-fast-switch/releases), unzip it, and double-click **Install or Update.command**. The package contains dependencies and a universal native helper. A suitable Node runtime is reused from your app, an earlier installation, or the system; Node and the official app are not redistributed.
+
+There is no fixed stability delay or temporary-app UI test during installation. Use **Settings > General > Speed** after it reopens. Fast uses the app's bundled filled lightning glyph in both collapsed model controls. Older patch revisions are upgraded through their matching original backup. Check Status.command shows the result.
 
 The automatic monitor listens for app exit events and applies compatible patches after future updates. A 10-second fallback poll covers missed events; it does not impose a delay on the restart command. If you manually reopen while a patch is being made, the monitor waits for another exit. Apply and Restart.command coordinates the entire sequence.
 
@@ -38,14 +44,13 @@ cd codex-fast-switch
 npm ci --ignore-scripts
 npm run build
 node cli.cjs doctor
-node cli.cjs enable
-node cli.cjs restart
+node cli.cjs setup
 ```
 
 Use `node cli.cjs restart` for one-time patching with automatic quit and reopen, or `install` when the app is already closed. To select another app location:
 
 ```sh
-node cli.cjs enable --app "/path/to/Codex.app"
+node cli.cjs setup --app "/path/to/Codex.app"
 node cli.cjs status
 node cli.cjs restore
 ```

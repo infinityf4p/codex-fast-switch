@@ -1,5 +1,12 @@
 # Tested builds
 
+## 2026-09-05: one-command installation, 0.2.2
+
+- Source, shell syntax and 32 core/native tests passed.
+- Installer tests cover forwarding the selected app to setup, rejecting damaged downloads before extraction, and rejecting unexpected download URLs.
+- Combined `setup` updated the local automatic worker successfully on app **26.901.41600 (7982)**. The existing revision 2 patch returned `already-installed` with `reopened: false`, preserving the running app.
+- The patch recipes and transaction logic are unchanged from 0.2.1. No relay or model request is involved in setup.
+
 ## 2026-09-05: filled Fast icon, 0.2.1
 
 Local verification used **26.901.41600 (7982)** on **arm64**.
