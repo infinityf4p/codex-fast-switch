@@ -1,0 +1,13 @@
+node_modules/
+dist/
+lib/native-helper
+.DS_Store
+*.log
+*.app/
+*.asar
+*.zip
+.env
+.env.*
+auth.json
+automatic*.json
+automatic.lock/

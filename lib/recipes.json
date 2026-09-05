@@ -1,0 +1,82 @@
+[
+  {
+    "kind": "ui",
+    "fingerprint": "d12f6631789e6512d2840425002c0e0cb62630dded683117dd75b9d69dd878c6",
+    "patchedFingerprint": "4d468ee7d2f1ea619af3327bfe14b689ebfdc6768df584c67548df808dbcef55",
+    "path": [
+      "body",
+      "body",
+      0,
+      "declarations",
+      4,
+      "init"
+    ],
+    "environment": [
+      {
+        "index": 1,
+        "stub": "memo"
+      },
+      {
+        "index": 4,
+        "stub": "host"
+      },
+      {
+        "index": 3,
+        "stub": "value"
+      },
+      {
+        "index": 8,
+        "stub": "auth"
+      },
+      {
+        "index": 15,
+        "stub": "query"
+      },
+      {
+        "index": 14,
+        "stub": "value"
+      }
+    ]
+  },
+  {
+    "kind": "request",
+    "fingerprint": "185f459739dd71a6c704ee2a5fe3c8011054763c720657903bd923ab5586cb58",
+    "patchedFingerprint": "54bab9ff814a412e03cc489e248cabbe3107ce59b7851a5397ac06cd28f0ca5c",
+    "path": [
+      "body",
+      "body",
+      1,
+      "test"
+    ],
+    "environment": [
+      {
+        "index": 3,
+        "stub": "readAuth"
+      },
+      {
+        "index": 5,
+        "stub": "readRequirements"
+      },
+      {
+        "index": 6,
+        "stub": "value"
+      }
+    ]
+  },
+  {
+    "kind": "models",
+    "fingerprint": "848c9651159bd3fe4136f4c6afa72ea84a28873cb5d9b41256f3cf3303d2e150",
+    "patchedFingerprint": "26056601a9ceb26354de70a7e36dece3a3adaf59a09ff5ae934892e17b4fe3a2",
+    "path": [
+      "body",
+      "body",
+      4,
+      "declarations",
+      0,
+      "init",
+      "arguments",
+      0
+    ],
+    "environment": []
+  }
+]

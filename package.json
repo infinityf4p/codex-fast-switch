@@ -1,0 +1,24 @@
+{
+  "name": "codex-fast-switch",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Reversible native Fast mode patches for the Codex desktop app on macOS",
+  "license": "MIT",
+  "author": "infinityf4p <186150610+infinityf4p@users.noreply.github.com>",
+  "repository": { "type": "git", "url": "https://github.com/infinityf4p/codex-fast-switch.git" },
+  "engines": { "node": ">=22.12.0" },
+  "scripts": {
+    "check": "node scripts/check.cjs",
+    "test": "node --test test/*.test.cjs",
+    "build": "node scripts/build.cjs",
+    "package": "node scripts/package.cjs",
+    "test:transactions": "node test/transactions.cjs",
+    "test:e2e": "node test/e2e.cjs",
+    "test:launchagent": "node test/launchagent.cjs"
+  },
+  "dependencies": {
+    "@electron/asar": "4.1.0",
+    "acorn": "8.15.0",
+    "acorn-walk": "8.3.4"
+  }
+}
