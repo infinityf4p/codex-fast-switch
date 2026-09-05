@@ -1,5 +1,16 @@
 # Tested builds
 
+## 2026-09-05: native compact control, 0.2.3
+
+Local verification used **26.901.41600 (7982)** on **arm64**.
+
+- Source checks and 35 core/native tests passed, including dynamic model, effort, tier and hidden-label cases for both compact layouts.
+- The optional UI test passed at **11:04:45 UTC**. A light-theme screenshot confirmed the full `GPT-5.6 Sol` label, native purple `Ultra`, a 14px filled Fast icon and the native chevron without overlap or clipping.
+- Fast sent `priority`; Standard omitted the tier and hid the icon. Both requests used `gpt-5.6-sol` and the app's normal Ultra-to-`max` effort mapping through the loopback mock.
+- The final UI test installed the patch on a copy and restored the exact officially signed original. A separate revision 2-to-3 upgrade and repeated installation also passed during development.
+- Earlier screenshot checks caught the legacy label's 16px SVG override. The final implementation uses the native direct-icon layout and does not override the app's font size.
+- Test model, theme, credentials and profile were temporary. The UI test used a mock Keychain; no relay or real account credentials were used.
+
 ## 2026-09-05: one-command installation, 0.2.2
 
 - Source, shell syntax and 32 core/native tests passed.
