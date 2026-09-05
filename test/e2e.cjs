@@ -26,8 +26,7 @@ async function main() {
           screenshot: process.env.CODEX_FAST_TEST_SCREENSHOT }),
         onPhase: (phase, detail) => console.log(JSON.stringify({ phase, detail })),
       }) };
-    assert.equal((await automatic.tick(state, options)).status, 'waiting-for-stable-update');
-    const installed = await automatic.tick(state, { ...options, now: start + 40000 });
+    const installed = await automatic.tick(state, options);
     assert.equal(installed.status, 'installed', installed.error);
     assert.equal(tx.marker(app).patchId, tx.PATCH_ID);
     const health = installed.result.health;

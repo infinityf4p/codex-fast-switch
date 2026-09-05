@@ -54,9 +54,12 @@ async function main() {
         tx.verify(app, true);
       });
     }
-    await test('Successful install and repeated install are idempotent', async () => {
-      assert.equal((await tx.install(app, state, { check: stubCheck })).status, 'installed');
-      assert.equal((await tx.install(app, state, { check: stubCheck })).status, 'already-installed');
+    await test('Default installation skips UI probing and repeated install is idempotent', async () => {
+      const phases = [];
+      assert.equal((await tx.install(app, state, { onPhase: phase => phases.push(phase) })).status, 'installed');
+      assert.equal(phases.includes('health-check'), false);
+      assert.equal(tx.checkedRecord(state, app).health, undefined);
+      assert.equal((await tx.install(app, state)).status, 'already-installed');
       tx.verify(app);
     });
     await test('Rollback refuses to overwrite a subsequent app change', () => {

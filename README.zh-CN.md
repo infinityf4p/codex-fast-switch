@@ -10,17 +10,20 @@
 
 - 目前仅支持 **macOS**，要求 macOS 13 及以上、支持克隆的 APFS 卷；官方 App 可能要求更高版本系统。
 - Apple Silicon 已实测。辅助程序包含 Intel 架构，但尚未在 Intel Mac 上验证完整流程。Windows、Linux 不支持安装补丁；CI 额外在 Linux 上检查可移植的核心逻辑。
-- 已验证 App **26.901.41123 / build 7942**，Bundle ID 为 `com.openai.codex`。支持名为 `Codex.app` 或 `ChatGPT.app` 的对应桌面应用，不接受其他 Bundle ID 的消费版 ChatGPT。
+- 已验证 App **26.901.41123 (7942)** 和 **26.901.41600 (7982)**，Bundle ID 为 `com.openai.codex`。支持名为 `Codex.app` 或 `ChatGPT.app` 的对应桌面应用，不接受其他 Bundle ID 的消费版 ChatGPT。
 - 所选模型须在 App 自带目录中拥有 priority 元数据，不会自动支持服务商自定义的任意模型别名。
-- 新版本须通过完整函数结构匹配和实际 UI 验证。文件名、压缩变量名、空白和引号变化可以兼容；不保证适配任意未来版本。
+- 新版本须匹配三个完整函数结构。文件名、压缩变量名、空白和引号变化可以兼容；不保证适配任意未来版本。
 
 ## 使用
 
 从 [Releases](https://github.com/infinityf4p/codex-fast-switch/releases) 下载 macOS ZIP，解压后运行 **Enable Automatic Fast.command**。发布包含依赖和通用架构辅助程序，Node 运行时取自本机已安装的 App 或系统，不包含官方 App 和 Node 分发包。
 
-用 Command-Q 完全退出官方 App。监控每分钟检查一次，等待文件稳定后验证临时副本。**测试副本可能短暂显示引导页面并抢占焦点**，请等待测试完成后再打开原 App。运行 Check Status.command 查看状态；完成后在 **Settings > General > Speed** 中切换。
+接着运行 **Apply and Restart.command**：正常退出 App、应用补丁、自动重新打开。安装没有固定的文件稳定等待，也不再启动临时 App 做 UI 测试。重开后在 **Settings > General > Speed** 中切换，运行 Check Status.command 可查看结果。
 
-- **Apply Once.command**：退出 App 后，验证并应用一次。
+自动服务会监听退出事件，为后续兼容更新应用补丁；每 10 秒的兜底检查用于补充遗漏事件，不会让直接重启命令等待。如果手动重开恰好撞上正在修改，后台会等下次退出。使用 Apply and Restart.command 可由程序完成整个顺序。
+
+- **Apply and Restart.command**：正常退出、应用一次并自动重开。
+- **Apply Once.command**：App 已退出时直接应用一次。
 - **Enable Automatic Fast.command**：开启更新后自动适配。
 - **Disable Automatic Fast.command**：停止自动适配，保留当前补丁。
 - **Restore Original App.command**：停用监控，恢复此次安装的完整原版。
@@ -38,9 +41,10 @@ npm ci --ignore-scripts
 npm run build
 node cli.cjs doctor
 node cli.cjs enable
+node cli.cjs restart
 ```
 
-`doctor` 仅检查签名及代码是否可识别；`install` 会验证临时副本并安装一次。自定义路径示例：
+`doctor` 仅检查签名及代码是否可识别；`restart` 负责退出、安装和重开，`install` 用于 App 已经退出的情况。自定义路径示例：
 
 ```sh
 node cli.cjs enable --app "/path/to/Codex.app"
@@ -48,19 +52,19 @@ node cli.cjs status
 node cli.cjs restore
 ```
 
-`--model ID` 只选择本地验证使用的模型；默认从 App 自带后端返回的、支持 priority 的模型中选择。`--state PATH` 可指定备份目录，之后查看、停用和恢复也要使用同一参数。每个 macOS 用户只支持一个自动服务。
+`--state PATH` 可指定备份目录，之后查看、停用和恢复也要使用同一参数。每个 macOS 用户只支持一个自动服务。旧版 `--model` 参数保留兼容，但安装过程已不再测试模型。
 
 当前用户须有权限写入 App 的父目录。App 和备份目录须处于同一文件系统，以便原子交换；安装器不会自动提权或修改所有者。
 
-## 验证与回退
+## 修改与回退
 
 安装器先校验原版签名、Bundle ID 和签名团队，再唯一匹配三个完整函数，校验变换后的结构，检查 12 组登录、策略和加载状态。已有的 `fast_mode = false` 限制仍然有效。
 
-随后克隆完整 App，修改归档、重算完整性校验并进行本地签名。测试使用临时 HOME、独立配置、文件形式的假凭据及本机 mock API，通过真实 UI 切换 Fast 和 Standard，检查配置、请求参数和完整回复。Fast 必须发出 `priority`，Standard 的新任务请求必须省略该参数。验证通过后再次确认原版未变化且已经退出，才交换完整 App 并保留原版备份。
+随后克隆完整 App，修改归档、重算完整性校验并进行本地签名。确认原版仍已退出且未被更新器替换后，交换完整 App 并保留原版备份。
 
-验证不需要你的中转站、API Key 或服务器权限，也不能证明真实 TPS 提升。它**不是网络沙箱**：App 仍可能发起更新检查或遥测等非模型请求。详见 [验证说明](docs/validation.md)。
+安装不会访问中转站或发送模型请求。开发者可以单独运行本机 mock UI 测试，检查 Fast 请求携带 `priority`、Standard 新任务省略该参数；此测试与安装分开，也不能证明真实 TPS 提升。详见 [验证说明](docs/validation.md)。
 
-识别失败或 UI 测试失败会保留当前原版。交换后失败会尝试恢复**同一版本**的原版，进程中断则在后续检查恢复。如果 App 正在运行或备份缺失，会等待或报告错误；不会强制退出用户 App，也不会覆盖无关的新更新。失败的构建在文件变化或手动重新启用前不会反复尝试。
+识别或修改失败会保留当前原版；交换后失败会尝试恢复**同一版本**的原版。直接重启命令会在失败后重新打开保留或恢复的 App；恢复尚未完成时会保留退出状态并报告错误。进程中断可在后续检查恢复。退出采用正常 macOS 请求，不会强制终止；退出被取消时不修改 App。失败构建不会自动反复尝试，文件变化、重新启用或显式运行重启命令可触发重试。
 
 ## 签名与备份
 
@@ -82,6 +86,7 @@ npm run check
 npm run build
 npm test
 npm run test:transactions
+npm run test:restart
 npm run test:e2e
 npm run test:launchagent
 npm run package

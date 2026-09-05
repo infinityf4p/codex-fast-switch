@@ -111,7 +111,7 @@ test('disable and restore leave a live transaction alone', { skip: process.platf
   assert.equal(automatic.status(root).configuration.enabled, true);
 });
 
-test('monitor waits for stability and exit, reports failure once, then retries a new build', async t => {
+test('monitor applies immediately after exit, reports failure once, then retries a new build', async t => {
   const root = temporary(t);
   tx.saveJson(automatic.configPath(root), { enabled: true, app: root, model: 'example-model' });
   let generation = 1;
@@ -121,17 +121,14 @@ test('monitor waits for stability and exit, reports failure once, then retries a
     install: async (app, state, config) => { calls++; assert.equal(config.model, 'example-model'); throw new Error('unsupported build'); } };
   assert.equal((await automatic.tick(root, { ...options, stopped: () => { throw Object.assign(new Error('running'), { code: 'APP_RUNNING' }); } })).status, 'waiting-for-exit');
   assert.equal((await automatic.tick(root, { ...options, stopped: () => { throw Object.assign(new Error('permission denied'), { code: 'EPERM' }); } })).status, 'process-check-failed');
-  assert.equal((await automatic.tick(root, options)).status, 'waiting-for-stable-update');
-  assert.equal((await automatic.tick(root, { ...options, now: 110000 })).status, 'waiting-for-stable-update');
   assert.equal(calls, 0);
-  assert.equal((await automatic.tick(root, { ...options, now: 140000 })).status, 'failed');
+  assert.equal((await automatic.tick(root, options)).status, 'failed');
   assert.equal((await automatic.tick(root, { ...options, now: 200000 })).status, 'rejected-until-next-update');
   assert.equal(calls, 1);
   assert.equal(notices.length, 1);
   generation++;
   const next = { ...options, now: 250000, install: async () => { calls++; return { status: 'installed' }; } };
-  assert.equal((await automatic.tick(root, next)).status, 'waiting-for-stable-update');
-  assert.equal((await automatic.tick(root, { ...next, now: 290000 })).status, 'installed');
+  assert.equal((await automatic.tick(root, next)).status, 'installed');
   assert.equal((await automatic.tick(root, { ...next, now: 350000 })).status, 'idle');
   assert.equal(calls, 2);
 });
@@ -142,16 +139,25 @@ test('an update disappearing during failed installation still yields a recorded 
   let gone = false;
   const options = { now: 0, stopped: () => {}, notifyUser: () => {}, getStamp: () => { if (gone) throw new Error('updating'); return 1; },
     install: async () => { gone = true; throw new Error('update in progress'); } };
-  await automatic.tick(root, options);
-  assert.equal((await automatic.tick(root, { ...options, now: 40000 })).status, 'failed');
+  assert.equal((await automatic.tick(root, options)).status, 'failed');
 });
 
-test('LaunchAgent uses an independent runtime and has no keepalive restart loop', () => {
+test('LaunchAgent runs the exit observer and only restarts after an unsuccessful exit', () => {
   const plist = automatic.plistDefinition('/stable/node', '/stable/automatic.cjs', '/state');
-  assert.deepEqual(plist.ProgramArguments, ['/stable/node', '/stable/automatic.cjs', 'tick', '/state']);
-  assert.equal(plist.StartInterval, 60);
+  assert.deepEqual(plist.ProgramArguments, ['/stable/node', '/stable/automatic.cjs', 'watch', '/state']);
+  assert.equal(plist.StartInterval, undefined);
   assert.equal(plist.RunAtLoad, true);
-  assert.equal(plist.KeepAlive, undefined);
+  assert.deepEqual(plist.KeepAlive, { SuccessfulExit: false });
+});
+
+test('a quick manual reopen does not reject the build', async t => {
+  const root = temporary(t);
+  tx.saveJson(automatic.configPath(root), { enabled: true, app: root });
+  const result = await automatic.tick(root, { stopped: () => {}, getStamp: () => 1,
+    install: async () => { throw Object.assign(new Error('reopened'), { code: 'APP_RUNNING' }); },
+    notifyUser: () => assert.fail('A normal reopen must not raise a failure dialog') });
+  assert.equal(result.status, 'waiting-for-exit');
+  assert.equal(result.rejectedStamp, undefined);
 });
 
 test('probe environment strips credentials, provider overrides, proxies and Node injection', () => {
