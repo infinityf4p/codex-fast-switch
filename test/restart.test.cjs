@@ -24,6 +24,45 @@ test('restart quits, patches and opens without a fixed delay or UI probe', async
   assert.equal(result.reopened, true);
 });
 
+test('an already patched app is left running', async () => {
+  const f = fixture();
+  const result = await restart('/app', '/state', { ...f.options, patched: () => true });
+  assert.deepEqual(f.calls, []);
+  assert.equal(result.status, 'already-installed');
+  assert.equal(result.reopened, false);
+});
+
+test('an already patched closed app is opened without being quit', async () => {
+  const f = fixture(false);
+  const result = await restart('/app', '/state', { ...f.options, patched: () => true });
+  assert.deepEqual(f.calls, ['open']);
+  assert.equal(result.status, 'already-installed');
+  assert.equal(result.reopened, true);
+});
+
+test('a KeepAlive-style restart loop stops after the first successful patch', async () => {
+  const f = fixture();
+  let patched = false;
+  const options = {
+    ...f.options,
+    patched: () => patched,
+    install: async () => {
+      const result = await f.options.install();
+      patched = true;
+      return result;
+    },
+  };
+  assert.equal((await restart('/app', '/state', options)).reopened, true);
+  assert.deepEqual(f.calls, ['quit', 'install', 'open']);
+  f.calls.length = 0;
+  for (let i = 0; i < 5; i++) {
+    const result = await restart('/app', '/state', options);
+    assert.equal(result.status, 'already-installed');
+    assert.equal(result.reopened, false);
+  }
+  assert.deepEqual(f.calls, []);
+});
+
 test('an already closed app is patched and opened directly', async () => {
   const f = fixture(false);
   await restart('/app', '/state', f.options);

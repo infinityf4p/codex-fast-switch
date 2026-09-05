@@ -7,6 +7,7 @@ const tx = require('./lib/transaction.cjs');
 async function watch(state, { intervalMs = 10000, tick = automatic.tick } = {}) {
   const config = tx.readJson(automatic.configPath(state));
   if (!config.enabled) return;
+  automatic.stopStrayRestartJobs();
   let stopping = false;
   let running = false;
   let requested = false;

@@ -150,6 +150,18 @@ test('LaunchAgent runs the exit observer and only restarts after an unsuccessful
   assert.deepEqual(plist.KeepAlive, { SuccessfulExit: false });
 });
 
+test('one-shot restart-now launchd jobs are identified for removal', () => {
+  assert.deepEqual(automatic.strayRestartLabels([
+    'io.github.infinityf4p.codex-fast-switch',
+    'io.github.infinityf4p.codex-fast-switch.restart-now-20260905-0910',
+    'io.github.infinityf4p.codex-fast-switch.restart-now',
+    'other.restart-now',
+  ]), [
+    'io.github.infinityf4p.codex-fast-switch.restart-now-20260905-0910',
+    'io.github.infinityf4p.codex-fast-switch.restart-now',
+  ]);
+});
+
 test('a quick manual reopen does not reject the build', async t => {
   const root = temporary(t);
   tx.saveJson(automatic.configPath(root), { enabled: true, app: root });

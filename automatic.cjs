@@ -9,6 +9,27 @@ const { assertStopped, identityFiles, discoverApp, requireMac, assertRuntime } =
 const { DEFAULT_STATE, saveJson, readJson, withLock, marker, PATCH_ID } = transaction;
 const LABEL = 'io.github.infinityf4p.codex-fast-switch';
 const service = () => `gui/${process.getuid()}/${LABEL}`;
+function strayRestartLabels(labels) {
+  const prefix = `${LABEL}.restart-now`;
+  return labels.filter(label => label === prefix || label.startsWith(`${prefix}-`));
+}
+function guiLabels() {
+  return execFileSync('/bin/launchctl', ['list'], { encoding: 'utf8' }).split('\n')
+    .map(line => line.trim().split(/\s+/).pop()).filter(label => label && label !== 'Label');
+}
+function stopStrayRestartJobs() {
+  if (process.platform !== 'darwin') return [];
+  const stopped = [];
+  try {
+    for (const label of strayRestartLabels(guiLabels())) {
+      try {
+        execFileSync('/bin/launchctl', ['bootout', `gui/${process.getuid()}/${label}`], { stdio: 'pipe' });
+        stopped.push(label);
+      } catch {}
+    }
+  } catch {}
+  return stopped;
+}
 const configPath = state => path.join(state, 'automatic.json');
 const statusPath = state => path.join(state, 'automatic-status.json');
 const readOptional = file => fs.existsSync(file) ? readJson(file) : {};
@@ -115,6 +136,7 @@ async function enable(state = DEFAULT_STATE, app = discoverApp(), { model } = {}
   return withLock(state, () => installAgent(state, app, model));
 }
 function installAgent(state, app, model) {
+  stopStrayRestartJobs();
   stopService(state);
   const agent = path.join(state, 'agent');
   const staged = path.join(state, `.agent-${crypto.randomUUID()}`);
@@ -155,6 +177,7 @@ function disableUnlocked(state) {
   const config = readOptional(configPath(state));
   fs.mkdirSync(state, { recursive: true, mode: 0o700 });
   saveJson(configPath(state), { ...config, enabled: false });
+  stopStrayRestartJobs();
   stopService(state);
   const plist = servicePlist();
   if (fs.existsSync(plist)) fs.rmSync(plist);
@@ -169,6 +192,7 @@ function status(state = DEFAULT_STATE) {
     transaction: readOptional(transaction.recordPath(state)) };
 }
 async function restart(state = DEFAULT_STATE, app = discoverApp(), options = {}) {
+  stopStrayRestartJobs();
   return withLock(state, async () => {
     const onPhase = phase => {
       saveJson(statusPath(state), { status: 'restarting', phase, checkedAt: new Date().toISOString() });
@@ -196,7 +220,8 @@ async function restore(state = DEFAULT_STATE, app = discoverApp()) {
     return transaction.restore(app, state);
   });
 }
-module.exports = { tick, enable, disable, restore, status, stamp, configPath, statusPath, plistDefinition, restart };
+module.exports = { tick, enable, disable, restore, status, stamp, configPath, statusPath, plistDefinition,
+  restart, strayRestartLabels, stopStrayRestartJobs };
 if (require.main === module) {
   const [command = 'status', state = DEFAULT_STATE] = process.argv.slice(2);
   Promise.resolve().then(() => {
