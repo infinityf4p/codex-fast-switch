@@ -14,6 +14,7 @@ const automatic = require('../../src/platforms/windows/automatic.cjs');
 const { launch } = require('../../src/platforms/windows/cli.cjs');
 const { planArchive } = require('../../src/core/adaptive.cjs');
 const { snippets, recipes } = require('../support/fixtures.cjs');
+const { sha256, patchArchive } = require('../../src/core/archive.cjs');
 
 test('Windows PowerShell launcher resolves Node and runs the real CLI', { skip: process.platform !== 'win32' }, t => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'codex-fast-launcher-'));
@@ -88,7 +89,7 @@ async function fixture(t) {
   }
   fs.writeFileSync(path.join(source, 'owl-shell-runtime.json'), JSON.stringify({ schemaVersion: 1,
     platform: 'win32', arch: 'x64', msixPackageDependencies: [] }));
-  const options = { verify: platform.metadata, stopped: () => {}, plan: archive => planArchive(archive, recipes) };
+  const options = { verify: platform.metadata, stopped: () => {}, plan: archive => planArchive(archive, recipes), planUpdater: () => [] };
   const install = extra => store.withLock(state, () => store.install(source, state, { ...options, ...extra }));
   return { root, source, state, unpacked, build, options, install };
 }
@@ -147,6 +148,31 @@ test('Windows CLI preserves the failure phase and message for diagnosis', { skip
     error => error.code === 'WINDOWS_NATIVE_FAILED' && !error.message.includes('-Payload'));
 });
 
+test('reviewed Owl runtimes without an embedded manifest preserve executable bytes and reject mismatched binaries', async t => {
+  const f = await fixture(t);
+  const executableFile = path.join(f.source, 'ChatGPT.exe');
+  const parsed = integrity.read(fs.readFileSync(executableFile));
+  parsed.resources.entries.splice(parsed.resources.entries.indexOf(parsed.entry), 1);
+  parsed.resources.outputResource(parsed.executable);
+  fs.writeFileSync(executableFile, Buffer.from(parsed.executable.generate()));
+  const original = fs.readFileSync(executableFile);
+  assert.throws(() => integrity.verify(f.source), { code: 'UNSUPPORTED_INTEGRITY' });
+  const chromeFile = path.join(f.source, 'chrome.dll');
+  const runtimes = new Map([[sha256(original), sha256(fs.readFileSync(chromeFile))]]);
+  const before = integrity.verify(f.source, runtimes);
+  assert.equal(before.mode, 'owl-runtime');
+  patchArchive(platform.archivePath(f.source), 'untouched.txt', () => Buffer.from('patched resource'));
+  const result = integrity.patch(f.source, before.headerSha256, runtimes);
+  assert.equal(result.mode, 'owl-runtime');
+  assert.equal(result.executableSignature, 'valid-openai');
+  assert.notEqual(result.headerSha256, before.headerSha256);
+  assert.deepEqual(fs.readFileSync(executableFile), original);
+  fs.appendFileSync(chromeFile, 'changed');
+  assert.throws(() => integrity.verify(f.source, runtimes), { code: 'UNSUPPORTED_INTEGRITY' });
+  fs.appendFileSync(executableFile, 'changed');
+  assert.throws(() => integrity.read(fs.readFileSync(executableFile), runtimes), { code: 'UNSUPPORTED_INTEGRITY' });
+});
+
 test('a new official version gets a new generation without modifying the previous copy', async t => {
   const f = await fixture(t);
   const first = await f.install();
@@ -197,7 +223,7 @@ test('process exit immediately before publication leaves the previous generation
     const { planArchive } = require('./src/core/adaptive.cjs');
     const { recipes } = require('./test/support/fixtures.cjs');
     store.withLock(process.argv[2], () => store.install(process.argv[1], process.argv[2], {
-      verify: platform.metadata, stopped: () => {}, plan: archive => planArchive(archive, recipes),
+      verify: platform.metadata, stopped: () => {}, plan: archive => planArchive(archive, recipes), planUpdater: () => [],
       onPhase: phase => { if (phase === 'prepared') process.exit(73); }
     })).catch(() => process.exit(1));
   `, f.source, f.state], { cwd: path.join(__dirname, '../..'), encoding: 'utf8', windowsHide: true });
@@ -234,7 +260,7 @@ test('Windows monitoring waits for exit and retries rejected builds only when th
   let generation = 1;
   let calls = 0;
   const options = { resolve: () => f.source, getStamp: () => generation, stopped: () => {},
-    install: async () => { calls++; throw new Error('unrecognized build'); } };
+    install: async () => { calls++; throw Object.assign(new Error('unrecognized build'), { code: 'UNSUPPORTED_PATCH' }); } };
   assert.equal((await automatic.tick(f.state, { ...options, stopped: () => {
     throw Object.assign(new Error('running'), { code: 'APP_RUNNING' });
   } })).status, 'waiting-for-exit');

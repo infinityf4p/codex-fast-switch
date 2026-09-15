@@ -5,6 +5,7 @@ const platform = require('./platform.cjs');
 const store = require('./store.cjs');
 const automatic = require('./automatic.cjs');
 const cleanup = require('./cleanup.cjs');
+const launcher = require('./launcher.cjs');
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 
 async function quitAndWait(apps, { onPhase = () => {}, timeoutMs = 30000,
@@ -32,7 +33,21 @@ async function launch(state, source, { restart = false, onPhase = () => {}, time
     if (!same(active.app, active.patched)) throw new Error('The local copy has changed. Restore it before applying again.');
     verify(active.app, { patched: true });
     if (processes([source]).length) throw Object.assign(new Error('The original app is running. Exit it or use Apply and Restart.cmd.'), { code: 'APP_RUNNING' });
-    if (!processes([active.app]).length) open(active.app);
+    if (!processes([active.app]).length) {
+      const current = active.revision === store.PATCH_REVISION && active.source === source && same(source, active.original);
+      if (!current) {
+        try {
+          const updated = await install(source, state, { onPhase });
+          if (!['installed', 'already-installed'].includes(updated.status)) throw new Error('The updated copy was not installed.');
+          open(updated.app);
+          return { ...updated, reopened: true };
+        } catch (error) {
+          if (same(active.app, active.patched) && !processes([active.app, source]).length) open(active.app);
+          throw error;
+        }
+      }
+    }
+    open(active.app);
     return { status: 'opened', app: active.app };
   }
   const running = await quitAndWait(apps, { onPhase, timeoutMs, processes, quit, now, wait });
@@ -40,7 +55,8 @@ async function launch(state, source, { restart = false, onPhase = () => {}, time
   try {
     const result = await install(source, state, { onPhase });
     if (!['installed', 'already-installed'].includes(result.status)) throw new Error(`Patch was not installed: ${result.status}`);
-    if (processes(apps).length) throw Object.assign(new Error('Codex was reopened while preparing the copy. Close it, then use Open Codex Fast.cmd.'), { code: 'APP_RUNNING' });
+    if (processes(apps).length) return { ...result, reopened: false, restartRequired: true,
+      message: 'The patch is installed. Quit the reopened Codex app, then open Codex Fast to use the updated copy.' };
     onPhase('reopening');
     open(result.app);
     return { ...result, reopened: true };
@@ -59,6 +75,7 @@ async function uninstall(state, { onPhase = () => {} } = {}) {
   if (prepared.apps.length) await quitAndWait(prepared.apps, { onPhase });
   onPhase('disabling-monitor');
   automatic.disable(state);
+  launcher.remove(state);
   onPhase('restoring-original');
   const result = { status: 'uninstalled', originalUnchanged: true, reopened: false,
     nextStep: 'Open the original Codex / ChatGPT app from the Start menu.' };
@@ -98,7 +115,12 @@ async function main(args = process.argv.slice(2)) {
   if (command === 'watch') return automatic.watch(state);
   if (command === 'tick') return automatic.tick(state);
   if (command === 'disable') return store.withLock(state, () => automatic.disable(state));
-  if (command === 'restore') return store.withLock(state, () => { automatic.disable(state); return store.restore(state); });
+  if (command === 'restore') return store.withLock(state, () => {
+    automatic.disable(state);
+    const result = store.restore(state);
+    launcher.remove(state);
+    return result;
+  });
   const source = command === 'uninstall' ? null : store.resolveSource(state, values.app);
   if (command === 'doctor') return store.doctor(source);
   let lastPhase = 'starting';
@@ -116,11 +138,13 @@ async function main(args = process.argv.slice(2)) {
         const active = store.checkedActive(state);
         const current = active?.revision === store.PATCH_REVISION && active.source === source &&
           platform.same(source, active.original) && platform.same(active.app, active.patched) && !platform.processes([source]).length;
-        result = await launch(state, source, { restart: !current, onPhase });
-      } else if (command === 'launch' || command === 'restart') result = await launch(state, source, { restart: command === 'restart', onPhase });
-      else result = await store.install(source, state, { onPhase });
+        result = await launch(state, source, { restart: !current, onPhase, install: launcher.install });
+        if (current) launcher.configure(state, active.app);
+      } else if (command === 'launch' || command === 'restart') result = await launch(state, source,
+        { restart: command === 'restart', onPhase, install: launcher.install });
+      else result = await launcher.install(source, state, { onPhase });
       store.saveJson(store.configPath(state), { ...previous, source, autoDiscover });
-      if (command === 'setup' || (['installed', 'already-installed'].includes(result.status) && previous?.enabled &&
+      if (command === 'setup' || (previous?.enabled &&
           (previous.workerRevision !== store.PATCH_REVISION || previous.workerLayout !== automatic.WORKER_LAYOUT))) {
         onPhase('updating-monitor');
         result = { ...result, automatic: automatic.enable(state, source, { autoDiscover }) };

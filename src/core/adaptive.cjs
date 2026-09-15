@@ -47,14 +47,16 @@ function nodePath(root, target, keys = []) {
   }
   return null;
 }
-function replacement(source, fn, target, kind) {
+function replacement(source, fn, target, kind, modelSettingsPath) {
   const original = source.slice(target.start, target.end);
   if (kind === 'models') {
-    if (fn.params[1]?.type !== 'Identifier' || target.type !== 'Identifier') throw new Error('Unsupported model query arguments.');
-    return `{...${original},additionalAvailableModels:new Set([${fn.params[1].name}.model])}`;
+    const settings = modelSettingsPath ? at(fn, modelSettingsPath) : fn.params[1];
+    if (settings?.type !== 'Identifier' || target.type !== 'Identifier') throw new Error('Unsupported model query arguments.');
+    return `{...${original},additionalAvailableModels:new Set([${settings.name}.model])}`;
   }
   if (target.type !== 'BinaryExpression') throw new Error('Unsupported authentication check.');
   const left = source.slice(target.left.start, target.left.end);
+  if (kind === 'saved-request') return `(${original}||${left}==="apiKey")`;
   return kind === 'ui' ? `(${original}||${left}==="apikey")` : `(${original}&&${left}!=="apikey")`;
 }
 
@@ -67,7 +69,7 @@ function adapt(source, recipes) {
     FunctionDeclaration(fn) {
       if (fn.end - fn.start > 15000) return;
       const body = source.slice(fn.start, fn.end);
-      if (!body.includes('fast_mode') && !body.includes('serviceTierForRequest')) return;
+      if (!body.includes('fast_mode') && !body.includes('serviceTierForRequest') && !body.includes('readServiceTier')) return;
       const normalized = shape(fn);
       const recipe = recipes.find(item => item.fingerprint === normalized.fingerprint);
       if (recipe) matches.push({ fn, recipe, names: normalized.names });
@@ -76,7 +78,7 @@ function adapt(source, recipes) {
   const edits = matches.map(match => {
     const target = at(match.fn, match.recipe.path);
     return { ...match, start: target.start, end: target.end,
-      value: replacement(source, match.fn, target, match.recipe.kind) };
+      value: replacement(source, match.fn, target, match.recipe.kind, match.recipe.modelSettingsPath) };
   });
   let patched = source;
   for (const edit of edits.toSorted((a, b) => b.start - a.start)) {
@@ -96,6 +98,7 @@ function adapt(source, recipes) {
 async function validateGates(matches) {
   const ui = matches.find(item => item.recipe.kind === 'ui');
   const request = matches.find(item => item.recipe.kind === 'request');
+  const saved = matches.find(item => item.recipe.kind === 'saved-request');
   const results = [];
   for (const auth of ['apikey', 'chatgpt', null]) {
     for (const blocked of [false, true]) {
@@ -106,14 +109,19 @@ async function validateGates(matches) {
           host: () => 'local', value: {}, auth: () => ({ authMethod: auth, isLoading: loading }),
           query: () => ({ data: requirements, isPending: false }),
           readAuth: async () => auth, readRequirements: async () => requirements,
+          savedTier: async (_client, _logger, _model, allowed) => await allowed() && !blocked,
         };
         const allowed = auth !== null && !blocked;
-        for (const [match, expected] of [[ui, allowed && !loading], [request, allowed]]) {
+        for (const [match, expected] of [[ui, allowed && !loading], [request, allowed], ...(saved ? [[saved, allowed]] : [])]) {
           const globals = {};
           for (const item of match.recipe.environment) globals[match.names[item.index]] = stubs[item.stub];
-          globals.client = { query: { setData() {} } };
+          globals.client = { query: { setData() {} }, requestClient: {}, logger: {}, getHostId: () => 'local',
+            getAuthMethod: async () => auth,
+            getAccount: async () => ({ account: auth == null ? null : { type: auth === 'apikey' ? 'apiKey' : auth } }) };
+          globals.adapters = { runtime: { isCopilotApiAvailable: async () => false }, storage: { readGlobalState: async () => false } };
           const context = vm.createContext(globals);
-          const invoke = match.recipe.kind === 'ui' ? '({hostId:"local"}).isServiceTierAllowed' : '(client,"local")';
+          const invoke = match.recipe.kind === 'ui' ? '({hostId:"local"}).isServiceTierAllowed' :
+            match.recipe.kind === 'saved-request' ? '(client,adapters,()=>{},()=>{}).readServiceTier("model")' : '(client,"local")';
           const result = await vm.runInContext(`(${match.patchedFunction})${invoke}`, context, { timeout: 1000 });
           if (result !== expected) throw new Error(`Gate verification failed: ${match.recipe.kind}, ${auth}, ${blocked}, ${loading}`);
         }
@@ -166,33 +174,41 @@ async function planArchive(archive, recipes = defaultRecipes, iconRecipe = recip
   const { adaptCompact } = require('./compact.cjs');
   asar.uncacheAll();
   const files = asar.listPackage(archive).map(file => file.replaceAll('\\', '/').replace(/^\//, ''))
-    .filter(file => file.startsWith('webview/') && file.endsWith('.js')).map(file => path.normalize(file));
+    .filter(file => (file.startsWith('webview/') || file.startsWith('.vite/build/')) && file.endsWith('.js'))
+    .map(file => path.normalize(file));
   const targets = [];
   const allMatches = [];
   let iconMatches = 0;
   let compactMatches = 0;
   for (const entry of files) {
+    const scope = entry.replaceAll('\\', '/').startsWith('.vite/') ? 'main' : 'webview';
+    const scopedRecipes = recipes.filter(recipe => (recipe.scopes || ['webview']).includes(scope));
+    if (!scopedRecipes.length) continue;
     const info = asar.statFile(archive, entry);
     if (info.unpacked || info.link || info.size > 32 * 1024 * 1024) continue;
     const bytes = asar.extractFile(archive, entry);
     const source = bytes.toString('utf8');
-    if (!source.includes('fast_mode') && !source.includes('serviceTierForRequest') &&
+    if (!source.includes('fast_mode') && !source.includes('serviceTierForRequest') && !source.includes('readServiceTier') &&
       !((iconRecipe || compactRecipe !== null) && source.includes('serviceTierIconKind'))) continue;
-    const result = adapt(source, recipes);
-    const icon = iconRecipe && source.includes('serviceTierIconKind') ? adaptFastIcon(result.patched, iconRecipe) : null;
-    const compact = compactRecipe !== null && source.includes('serviceTierIconKind')
+    const result = adapt(source, scopedRecipes);
+    const icon = scope === 'webview' && iconRecipe && source.includes('serviceTierIconKind') ? adaptFastIcon(result.patched, iconRecipe) : null;
+    const compact = scope === 'webview' && compactRecipe !== null && source.includes('serviceTierIconKind')
       ? adaptCompact(icon?.patched ?? result.patched, compactRecipe) : null;
     if (icon?.matched) iconMatches++;
     if (compact?.matched) compactMatches++;
     if (!result.matches.length && !icon?.changed && !compact?.changed) continue;
-    allMatches.push(...result.matches);
+    allMatches.push(...result.matches.map(match => ({ ...match, scope })));
     targets.push({ entry, sourceSha256: sha256(bytes), patched: Buffer.from(compact?.patched ?? icon?.patched ?? result.patched),
       kinds: [...result.matches.map(item => item.recipe.kind), ...(icon?.changed ? ['fast-icon'] : []),
         ...(compact?.changed ? ['compact-model-control'] : [])] });
   }
-  for (const recipe of recipes) {
-    if (allMatches.filter(item => item.recipe.kind === recipe.kind).length !== 1) {
-      throw new Error(`Cannot uniquely recognize ${recipe.kind} logic. The official app will be kept unchanged.`);
+  const required = new Set([...recipes.filter(recipe => !recipe.optional).map(recipe => recipe.kind),
+    ...allMatches.flatMap(match => match.recipe.requires || [])]);
+  for (const kind of new Set([...required, ...allMatches.map(match => match.recipe.kind)])) {
+    const scopes = new Set(recipes.filter(recipe => recipe.kind === kind).flatMap(recipe => recipe.scopes || ['webview']));
+    if (!scopes.size) scopes.add('webview');
+    for (const scope of scopes) if (allMatches.filter(item => item.recipe.kind === kind && item.scope === scope).length !== 1) {
+      throw new Error(`Cannot uniquely recognize ${kind} logic in ${scope}. The official app will be kept unchanged.`);
     }
   }
   if (iconRecipe && iconMatches !== 1) throw new Error('Cannot uniquely recognize the Fast icon. The official app will be kept unchanged.');

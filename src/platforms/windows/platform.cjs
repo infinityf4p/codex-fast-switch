@@ -68,20 +68,24 @@ function discoverApp(explicit) {
 const binaryPath = app => path.join(app, 'ChatGPT.exe');
 const identityFiles = () => ['ChatGPT.exe', 'chrome.dll', 'resources/codex.exe', 'resources/app.asar',
   'owl-shell-runtime.json', 'resources/owl-app.ini'];
+const stamp = app => JSON.stringify([app, ...identityFiles().map(file => {
+  const stat = fs.statSync(path.join(app, file));
+  return [stat.size, stat.mtimeMs, stat.ctimeMs];
+})]);
 const fingerprint = app => Object.fromEntries(identityFiles().map(file => [file, sha256(fs.readFileSync(path.join(app, file)))]));
 function same(app, expected) {
   try { return JSON.stringify(fingerprint(app)) === JSON.stringify(expected); } catch { return false; }
 }
 function verify(app, { patched = false } = {}) {
   const info = metadata(app);
+  const archiveIntegrity = require('./integrity.cjs').verify(app);
   const files = ['ChatGPT.exe', 'chrome.dll', 'resources/codex.exe'].map(file => path.join(app, file));
   const signatures = native('signature', { files });
   if (!Array.isArray(signatures) || signatures.length !== files.length || signatures.some((signature, index) =>
-    signature.file !== files[index] || (patched && index === 0 ? signature.status !== 'NotSigned' :
+    signature.file !== files[index] || (patched && index === 0 && archiveIntegrity.mode === 'embedded' ? signature.status !== 'NotSigned' :
       signature.status !== 'Valid' || !/(?:^|,\s*)O="?OpenAI OpCo, LLC"?(?:,|$)/.test(signature.subject || '')))) {
     throw new Error('The Windows runtime must have valid OpenAI Authenticode signatures.');
   }
-  require('./integrity.cjs').verify(app);
   return info;
 }
 function processPaths(apps) {
@@ -98,7 +102,7 @@ function assertStopped(apps) {
   if (processes(apps).length) throw Object.assign(new Error('Codex is running. Exit it from its menu or system tray, then retry.'), { code: 'APP_RUNNING' });
 }
 const requestQuit = apps => native('quit', { binaries: [...new Set(processes(apps).map(item => item.nativePath))] });
-const openApp = app => native('open', { binary: binaryPath(app) });
+const openApp = (app, { userData } = {}) => native('open', { binary: binaryPath(app), userData });
 function assertRuntime(node) {
   const result = execFileSync(node, ['--version'], { encoding: 'utf8', windowsHide: true, timeout: 10000 }).trim();
   const [major, minor] = result.replace(/^v/, '').split('.').map(Number);
@@ -106,4 +110,4 @@ function assertRuntime(node) {
   return node;
 }
 module.exports = { DEFAULT_STATE, nativeScript, native, requireWindows, metadata, normalizeApp, discoverApp, archivePath,
-  binaryPath, identityFiles, fingerprint, same, verify, processes, assertStopped, requestQuit, openApp, assertRuntime };
+  binaryPath, identityFiles, stamp, fingerprint, same, verify, processes, assertStopped, requestQuit, openApp, assertRuntime };

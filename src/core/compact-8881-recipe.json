@@ -1,0 +1,30 @@
+{
+  "legacy": {
+    "fingerprint": "9f6ab54319a1791979a32779fe59d8ec45e00ce7ed58cee02467efebf3b914e5",
+    "patchedFingerprint": "e10f16ca02674e8e2aeabd955e9f55b4aee8a2ccf3e501d848c8a0bceb67468c",
+    "paths": {
+      "prefix": ["body","body",115,"expression","consequent","expressions",0,"right","alternate","arguments",1,"properties",4,"value","arguments",1,"properties",1,"value","elements",0,"arguments",1,"properties",1,"value","elements",2,"arguments",1,"properties",3,"value"],
+      "gap": ["body","body",115,"expression","consequent","expressions",0,"right","alternate","arguments",1,"properties",4,"value","arguments",1,"properties",0,"value"],
+      "modelClass": ["body","body",115,"expression","consequent","expressions",0,"right","alternate","arguments",1,"properties",4,"value","arguments",1,"properties",1,"value","elements",0,"arguments",1,"properties",0,"value"],
+      "serviceTier": ["body","body",115,"expression","consequent","expressions",0,"right","alternate","arguments",1,"properties",4,"value","arguments",1,"properties",1,"value","elements",0,"arguments",1,"properties",1,"value","elements",2,"arguments",1,"properties",2,"value"],
+      "glyphBefore": ["body","body",115,"expression","consequent","expressions",0,"right","alternate","arguments",1,"properties",4,"value","arguments",1,"properties",1,"value","elements",0,"arguments",1,"properties",1,"value","elements",2],
+      "effortCollapse": ["body","body",115,"expression","consequent","expressions",0,"right","alternate","arguments",1,"properties",4,"value","arguments",1,"properties",1,"value","elements",1,"arguments",1,"properties",0,"value"],
+      "effortClass": ["body","body",115,"expression","consequent","expressions",0,"right","alternate","arguments",1,"properties",4,"value","arguments",1,"properties",1,"value","elements",1,"arguments",1,"properties",1,"value"],
+      "children": ["body","body",117,"expression","consequent","expressions",0,"right","arguments",1,"properties",16,"value"],
+      "hideLabel": ["body","body",0,"declarations",1,"id","properties",2,"value"],
+      "runtime": ["body","body",117,"expression","consequent","expressions",0,"right","callee","expressions",1,"object"]
+    }
+  },
+  "modern": {
+    "fingerprint": "9f80aadfe20260b9b24fe23b78657b9a88d8abee5e1082c2d6f64088dc29c5b4",
+    "patchedFingerprint": "d2e2ba701792a1a06df7bd68f6e78907661cb0bb05eaeda6e990115102caa9d7",
+    "paths": {
+      "prefix": ["body","body",7,"expression","consequent","expressions",0,"right","alternate","arguments",1,"properties",1,"value","elements",0,"arguments",1,"properties",1,"value","elements",3,"consequent","arguments",1,"properties",1,"value","arguments",1,"properties",3,"value"],
+      "modelClass": ["body","body",7,"expression","consequent","expressions",0,"right","alternate","arguments",1,"properties",1,"value","elements",0,"arguments",1,"properties",1,"value","elements",3,"consequent","arguments",1,"properties",0,"value"],
+      "parentClass": ["body","body",7,"expression","consequent","expressions",0,"right","alternate","arguments",1,"properties",0,"value"],
+      "icon": ["body","body",7,"expression","consequent","expressions",0,"right","alternate","arguments",1,"properties",1,"value","elements",0,"arguments",1,"properties",1,"value","elements",2,"consequent"],
+      "iconKind": ["body","body",7,"expression","consequent","expressions",0,"right","alternate","arguments",1,"properties",1,"value","elements",0,"arguments",1,"properties",1,"value","elements",2,"consequent","arguments",1,"properties",1,"value"],
+      "chevron": ["body","body",11,"expression","consequent","expressions",0,"right"]
+    }
+  }
+}

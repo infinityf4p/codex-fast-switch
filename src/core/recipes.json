@@ -78,5 +78,23 @@
       0
     ],
     "environment": []
+  },
+  {
+    "kind": "models",
+    "fingerprint": "68251cc9009df1349a74c5263ece07465cca0f02ac959be47854f99930e52c90",
+    "patchedFingerprint": "3ceb0575ba184f439df88c408909b9ea82789abe9df42431b0801fdb6ba8d511",
+    "path": ["body", "body", 4, "declarations", 0, "init", "arguments", 0],
+    "modelSettingsPath": ["body", "body", 0, "declarations", 1, "id", "properties", 0, "value"],
+    "requires": ["saved-request"],
+    "environment": []
+  },
+  {
+    "kind": "saved-request",
+    "optional": true,
+    "scopes": ["webview", "main"],
+    "fingerprint": "d6fed6d2f1a28969ab33cef77e46c6c91e0e3f0c0fbae4e7bbdbec406ebe0d84",
+    "patchedFingerprint": "017af7a432d43749ceed3bcb5b441f1960fa19f359d097406a705b87d890e6da",
+    "path": ["body", "body", 1, "argument", "properties", 0, "value", "body", "body", 1, "argument", "expressions", 1, "arguments", 3, "body", "body", 2, "argument", "right"],
+    "environment": [{ "index": 6, "stub": "savedTier" }]
   }
 ]

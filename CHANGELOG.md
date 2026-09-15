@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Windows patch revision 4 supports app 26.908.40834 (8881): recognize the reviewed Owl runtime without an embedded ASAR manifest, preserve its signed executable, and adapt the changed model-settings, compact picker and Windows updater functions. Include API-key accounts when the new shared request path reads the saved speed, in both main and renderer bundles, while retaining the existing policy and other authentication restrictions. Older runtimes still require their embedded ASAR hash; unknown runtime pairs are rejected.
+- Windows patch revision 3 reuses the native update button and confirmation UI with an independent copy-update helper, atomic handoff, profile preservation and failure recovery. Real-app testing caught a detached child exiting with Owl; the helper now starts through Windows Explorer. The isolated update flow passed on app 26.901.51231 (8109) using a same-version official source change. Official package downloads remain in Microsoft Store and were not exercised by this test.
+- Add a stable Codex Fast shortcut, repair direct copy shortcuts, synchronize stopped copies before launch, and retry temporary monitor failures with backoff while removing incomplete staging data.
+- Finish monitor migration when Codex reopens after a new generation has already been published, reporting that another restart is needed instead of failing the completed installation. Normal launch activates an existing window and repairs an enabled monitor left on an older revision or layout.
+- Redirect recognized per-user official-app and copy shortcuts through the stable Fast launcher, retain original shortcut backups for uninstall, and repair version-specific shortcuts recreated by app startup. Preserve custom launch arguments, unrelated targets, shared shortcuts and Store package registrations.
 - Add a macOS one-command uninstaller that uses the installed recovery CLI, stops monitoring and restores the original app while retaining personal data, recovery records and the local signing identity.
 - Separate uninstall instructions and app-version compatibility in both READMEs.
 - Organize shared code under src/core and platform implementations under src/platforms; group auxiliary launchers, unit tests, integration flows and test support separately.

@@ -42,7 +42,13 @@ Run in PowerShell:
 
 Or download and double-click [install.cmd](https://github.com/infinityf4p/codex-fast-switch/releases/latest/download/install.cmd). No manual extraction or npm dependency installation is required.
 
-Windows creates and opens a local patched copy. The original Start menu icon still opens the official app. To reopen the copy, run `install.cmd` again or use `Open Codex Fast.cmd` from the ZIP package. Quit with **Ctrl+Q** or the tray's Quit command; closing a window may leave the app running in the tray.
+Windows keeps patched copies in `%LOCALAPPDATA%\Codex Fast Switch\versions\<id>\app`. Use the stable **Codex Fast** Start menu shortcut or `Open Codex Fast.cmd` from the ZIP; the launcher reads the active generation and checks for a newer installed official version before opening a stopped copy.
+
+Default installation redirects recognized original and older-copy `.lnk` files in the current user's Desktop, Start menu and taskbar shortcut directories to the patched launcher. Monitoring also repairs version-specific links rewritten when the app starts. Original links are backed up and restored on uninstall; custom arguments and shared all-user shortcuts are preserved. Store-generated application entries still open the original app. Replace a pin to that Store entry with **Codex Fast**. Quit with **Ctrl+Q** or the tray's Quit command; closing a window may leave the app running in the tray.
+
+Windows patch revision 4 supports app **26.908.40834 (8881)** and reuses the app's native update button, status and confirmation UI. Once the installed official app updates, the running Fast copy offers an update. Clicking it normally quits the app, prepares a new patched copy and reopens it. Failed installations preserve the previous copy and report the error for retry. Microsoft Store still downloads and installs the official app; the in-app update check can also open the Store.
+
+Existing installations need one run of an `install.cmd` containing revision 4. An older installer reporting `Cannot uniquely identify the Windows ASAR integrity resource` needs this compatibility update: the newer Owl runtime removed the old EXE resource. Revision 4 preserves the reviewed new runtime's official binaries and signatures while continuing to require embedded hashes on older runtimes.
 
 ## Switching Fast
 
@@ -109,21 +115,23 @@ Run in PowerShell, or download and double-click [uninstall.cmd](https://github.c
 & { $fastUninstaller = Join-Path $env:TEMP 'codex-fast-uninstall.cmd'; Invoke-WebRequest 'https://github.com/infinityf4p/codex-fast-switch/releases/latest/download/uninstall.cmd' -OutFile $fastUninstaller -UseBasicParsing -ErrorAction Stop; & $fastUninstaller }
 ```
 
-This normally quits the patched copy and removes monitoring and patch installation files, keeping Codex's personal settings and conversations. Source users can also run `node cli.cjs uninstall`.
+This normally quits the patched copy, restores original shortcuts changed by this tool, and removes monitoring and patch installation files, keeping Codex's personal settings and conversations. Source users can also run `node cli.cjs uninstall`.
 
 ## Supported App Versions
 
-Actual app testing recorded as of **2026-09-05**:
+Actual app testing recorded as of **2026-09-15**:
 
 | Platform | Tested app version | Coverage |
 | --- | --- | --- |
 | macOS Apple Silicon | **26.901.41600 (7982)** | Patch v0.2.4: Fast/Standard requests, native model control, local signing, and restoration |
 | macOS Apple Silicon | **26.901.41123 (7942)** | Patch v0.1.0: Fast/Standard requests, monitoring, and restoration |
 | Windows x64 | **26.901.41600 (7982)**, Store package **26.901.5280.0** | Local copy and Fast/Standard requests; separate existing-session switching tests on revision 2 |
+| Windows x64 | **26.901.51231 (8109)**, Store package **26.901.6511.0** | Revision 3 native update button, same-version source change, patched generation creation and relaunch with the same profile in an isolated real app |
+| Windows x64 | **26.908.40834 (8881)**, Store package **26.908.4834.0** | Revision 4 upgrade from an isolated 8109 Fast copy through the native button, preserving its profile and the new official EXE signature; Fast/Standard requests and compact control passed |
 
-Compatibility is detected from the app's code structure, not a version allowlist. New builds with compatible structures can be patched automatically after exit. Unrecognized builds stop with a notification and keep or restore the official app for that version; the patch does not downgrade the app. Unlisted versions, Intel Mac, and Windows ARM64 are unverified. Future compatibility is not guaranteed. Run `node cli.cjs doctor` to check whether your installed build is recognized.
+Compatibility is detected from the app's code structure. Windows Owl runtimes without an embedded ASAR manifest must also match reviewed binary hashes. Compatible new builds can be patched automatically after exit. Unrecognized builds stop with a notification and keep or restore the official app for that version; the patch does not downgrade the app. Unlisted versions, Intel Mac, and Windows ARM64 are unverified. Future compatibility is not guaranteed. Run `node cli.cjs doctor` to check whether your installed build is recognized.
 
-System requirements: macOS 13+ with APFS clone support, or Windows 10 2004+ / 11 with the Owl client. The official app's own requirements still apply. Linux installation is unsupported. macOS uses a local signing certificate; Windows copies are unsigned and may be restricted by system permissions or application-control policies.
+System requirements: macOS 13+ with APFS clone support, or Windows 10 2004+ / 11 with the Owl client. The official app's own requirements still apply. Linux installation is unsupported. macOS uses a local signing certificate. Older Windows runtimes need an unsigned patched EXE; reviewed newer Owl runtimes retain the official EXE signature. System permissions or application-control policies may still restrict local copies.
 
 These records apply to the patch revisions tested; documentation or layout changes do not imply a fresh app integration run. Installation and uninstall make no model API calls and do not change relay configuration.
 

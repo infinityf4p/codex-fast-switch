@@ -106,3 +106,21 @@ test('compact adaptation rejects missing, ambiguous, or changed known layouts', 
   wrongOutput.legacy.patchedFingerprint = 'unrecognized';
   assert.throws(() => adaptCompact(source, wrongOutput), /Unexpected transformed legacy/);
 });
+
+test('compact recipe variants keep both layouts from the same reviewed version', () => {
+  const newer = source.replace('max-w-40', 'max-w-48').replace('native-chevron', 'new-chevron');
+  const next = structuredClone(recipe);
+  const before = parse(newer).body;
+  const after = parse(`${expectedLegacy}\n${expectedModern}`.replace('max-w-40', 'max-w-48')
+    .replaceAll('native-chevron', 'new-chevron')).body;
+  for (const [index, role] of ['legacy', 'modern'].entries()) {
+    next[role].fingerprint = shape(before[index]).fingerprint;
+    next[role].patchedFingerprint = shape(after[index]).fingerprint;
+  }
+  for (const input of [source, newer]) {
+    const result = adaptCompact(input, [recipe, next]);
+    assert.equal(result.changed, true);
+    assert.equal(adaptCompact(result.patched, [recipe, next]).changed, false);
+  }
+  assert.throws(() => adaptCompact(source.replace('native-chevron', 'new-chevron'), [recipe, next]), /both compact/);
+});

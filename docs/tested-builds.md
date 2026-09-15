@@ -1,5 +1,49 @@
 # Tested builds
 
+## 2026-09-15: Windows 8881 compatibility and cross-version update
+
+Verification used Windows x64, installed Store package **26.908.4834.0**, app **26.908.40834 (8881)** and Windows patch revision **4**. The previous personal Fast copy was **26.901.51231 (8109)**, revision **3**.
+
+- The update error `Cannot uniquely identify the Windows ASAR integrity resource` occurred during source verification. Build 8881 no longer embeds the old `INTEGRITY/ELECTRONASAR` manifest. Its reviewed EXE/DLL hash pair and OpenAI signatures passed; patching retained those binaries and their signatures. Older embedded-manifest validation remains required, and unknown runtime pairs are rejected.
+- The new model-settings wrapper, both compact picker variants and the native updater initializer matched reviewed whole-function fingerprints. The saved-speed request path now recognizes API-key accounts in both renderer and main bundles while retaining feature-policy, Copilot and personal-access-token restrictions. Synthetic tests reject a missing or duplicate required bundle copy.
+- The complete integration run copied the old installed Fast app into a disposable state, clicked its native Update button, installed 8881 and observed a new process with the same isolated user-data directory and profile marker. A subsequent probe of the updated generation sent `priority` for Fast and omitted the tier for Standard using `gpt-6-astra`; both mock responses completed. The visible compact control retained the full model label and chevron, displayed a 14px filled Fast icon and hid it for Standard, with no clipping or overlap.
+- Early UI attempts were blocked by a fresh-profile announcement or submitted before refreshed authentication state reached the composer. The harness now closes that specific announcement and waits for the visible selected speed before sending. One final-run attempt failed to establish the test-only DevTools connection before clicking Update; a fresh retry passed. These failed attempts are not counted as successful integration runs.
+- The personal app and monitor retained their process IDs and creation times; the personal active record, monitor configuration and existing ChatGPT shortcut retained their hashes. Integration copies, temporary profiles and test shortcuts were removed.
+- The targeted shared-core and Windows unit suites passed **53 tests**, with **1 macOS-only skip** and **0 failures**. JavaScript, JSON and Windows PowerShell syntax checks passed.
+
+The repaired revision-4 worker was then deployed to the personal installation without quitting its app. Installed worker hashes matched the source, compatibility recognition passed, and the update check reported 8881 available with no recorded failure. One new monitor replaced the old one. The personal app retained its PID and creation time, active revision-3 generation and file hashes; the official package was also unchanged. The personal app itself remained on 8109, ready for the user's next native Update click.
+
+The test used an already-installed official package; it did not download an update from Microsoft Store. App background initialization was allowed, while all model requests used a dummy key and a loopback mock. It does not measure provider performance, test every model or tool-using follow-up turn, or establish new macOS/ARM64 compatibility. Readiness during an in-progress authentication refresh remains the app's native behavior.
+
+## 2026-09-08: Windows shortcut routing
+
+The Windows shortcut, update and installation unit suites passed **30 tests**. Real `.lnk` fixtures covered executable and Explorer-based Store targets, implicit pinned-shortcut folders, repeated maintenance, app-rewritten paths, custom profiles, unrelated same-name links, original-byte restoration, preservation of user changes, isolated states and rejection of restoration records outside the configured shortcut roots. Source and PowerShell syntax checks passed.
+
+The personal app's `ChatGPT.lnk` had been rewritten to its concrete generation path after activation. The installed launcher and monitor were updated, and both that shortcut and `Codex Fast.lnk` were verified to use the stable launcher after a real shortcut activation and two monitor checks. The app PID, creation time, active generation and official/patched file hashes were retained. No matching Desktop or public shortcuts were present on this machine. Store-generated Start entries and packaged pins were not redirected. This check did not exercise a full app restart or uninstall the personal installation.
+
+## 2026-09-08: Windows installation recovery
+
+The personal installation upgrade on September 7 published app **26.901.51231 (8109)** with Windows patch revision **3**, replacing the active pointer from **26.901.41600 (7982)**, revision **2**. The CLI then detected a reopened previous copy or official app and raised `APP_RUNNING`, skipping monitor migration. The new generation and stable shortcuts had already been installed. This was a partially completed setup, not a successful end-to-end update.
+
+- A controlled test called the old installed launch function with simulated reopen timing and reproduced the recorded exception. The corrected flow returns the installed result with `restartRequired: true` and completes monitor migration. Regression tests also cover activating an existing copy and repairing its stale monitor during normal launch.
+- The personal installation's worker was upgraded to revision **3**, layout **1**, through normal launch. The original app process ID, creation time and open window were retained. The legacy monitor exited, one new monitor started, and the Startup entry moved to `agent/src/platforms/windows/native.ps1`.
+- The active generation record, patched app hashes and official source hashes were unchanged during repair. The updater check reported no newer locally installed source. No model requests or app Quit commands were issued by the repair.
+- Source and PowerShell syntax checks passed. The targeted Windows unit suites passed **28 tests**, with **0 failures** and **0 skips**.
+
+The user's separately reported startup dialog was not reproduced. Activating the existing window succeeded; the controlled exception test does not establish the cause of that unknown dialog. This recovery did not rerun the complete native update cycle or Microsoft Store download.
+
+## 2026-09-07: Windows native update button, revision 3
+
+Local verification used Windows x64, Store package **26.901.6511.0**, app **26.901.51231 (8109)** and patch revision **3**. `test/integration/windows/updates.cjs` created independent app copies, browser data, `CODEX_HOME` and Windows profile directories, with a dummy key and a loopback model provider.
+
+- The native Update icon appeared and was clicked through the test window's own loopback DevTools connection. The updater waited for that app to quit, created and verified another patched generation, repaired its shortcut and launched a new process with the same isolated user-data directory.
+- The running personal app and its backend/monitor processes retained their PIDs and creation times. SHA-256 hashes of the personal active record, monitor configuration and existing ChatGPT shortcut were unchanged. All test processes, copies and test shortcuts were removed.
+- An earlier attempt showed that a directly spawned detached helper also exited when Owl quit. Starting the helper through Windows Explorer and using an atomic handoff file fixed the failure. The handoff preserves the isolated profile/home environment without inheriting Explorer's personal configuration.
+- A subsequent shortcut failure in an incomplete temporary Windows profile exercised reopening the previous verified copy. Shortcut setup now creates a missing Programs directory. The final full run completed successfully after the test environment and cleanup process checks were corrected.
+- Source and PowerShell syntax checks passed. Unit tests: **60 passed**, **10 platform-specific skips**, **0 failed**.
+
+The old official build was no longer installed, so the update trigger was a source-path change between signed copies of the **same official version**. The test did not download a Microsoft Store package, exercise a real version-number upgrade, verify the relaunched renderer through DevTools, or rerun Fast/Standard model request checks. The relaunch check verified the new executable, integrity and process arguments with the retained profile marker. Normal app background initialization and plugin/runtime downloads were allowed.
+
 ## 2026-09-05: reported existing-session Fast switching, Windows revision 2
 
 The supplied test report covers Windows app **26.901.41600 (7982)**, patch revision **2**, and `gpt-6-astra`, tested at **23:06-23:10 Asia/Shanghai**. An isolated app copy, profile and Codex home used a dummy key and a loopback Responses server. All nine ordinary conversation replies completed across two fixed thread IDs; two title requests were excluded.

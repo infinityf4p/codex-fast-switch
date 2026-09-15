@@ -1,7 +1,8 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const walk = require('acorn-walk');
-const defaultRecipe = JSON.parse(fs.readFileSync(path.join(__dirname, 'compact-recipe.json'), 'utf8'));
+const defaultRecipes = ['compact-recipe.json', 'compact-8881-recipe.json']
+  .map(file => JSON.parse(fs.readFileSync(path.join(__dirname, file), 'utf8')));
 
 function transformCompactFunction(source, fn, role, other, recipe) {
   const { at } = require('./adaptive.cjs');
@@ -50,20 +51,24 @@ function transformCompactFunction(source, fn, role, other, recipe) {
   return result;
 }
 
-function adaptCompact(source, recipe = defaultRecipe) {
+function adaptCompact(source, recipes = defaultRecipes) {
   const { parse, shape } = require('./adaptive.cjs');
+  const supported = Array.isArray(recipes) ? recipes : [recipes];
   const matches = { legacy: [], modern: [] };
   walk.simple(parse(source), { FunctionDeclaration(fn) {
     if (fn.end - fn.start > 32000 || !source.slice(fn.start, fn.end).includes('stripGptPrefix')) return;
     const fingerprint = shape(fn).fingerprint;
-    for (const role of Object.keys(matches)) {
+    for (const recipe of supported) for (const role of Object.keys(matches)) {
       if ([recipe[role].fingerprint, recipe[role].patchedFingerprint].includes(fingerprint)) {
-        matches[role].push({ fn, patched: fingerprint === recipe[role].patchedFingerprint });
+        matches[role].push({ fn, recipe, patched: fingerprint === recipe[role].patchedFingerprint });
       }
     }
   } });
   if (!matches.legacy.length && !matches.modern.length) return { patched: source, matched: false, changed: false };
-  if (matches.legacy.length !== 1 || matches.modern.length !== 1) throw new Error('Cannot uniquely recognize both compact model picker layouts.');
+  if (matches.legacy.length !== 1 || matches.modern.length !== 1 || matches.legacy[0].recipe !== matches.modern[0].recipe) {
+    throw new Error('Cannot uniquely recognize both compact model picker layouts.');
+  }
+  const recipe = matches.legacy[0].recipe;
   const edits = [];
   for (const role of Object.keys(matches)) {
     const match = matches[role][0];

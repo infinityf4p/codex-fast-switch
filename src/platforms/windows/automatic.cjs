@@ -3,23 +3,20 @@ const path = require('node:path');
 const crypto = require('node:crypto');
 const platform = require('./platform.cjs');
 const store = require('./store.cjs');
-const { copyRuntime } = require('../../core/runtime.cjs');
+const launcher = require('./launcher.cjs');
 const WORKER_LAYOUT = 1;
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
-const stamp = app => JSON.stringify([app, ...platform.identityFiles().map(file => {
-  const stat = fs.statSync(path.join(app, file));
-  return [stat.size, stat.mtimeMs, stat.ctimeMs];
-})]);
+const stamp = platform.stamp;
 const serviceName = state => `Codex Fast Switch ${crypto.createHash('sha256').update(path.resolve(state).toLowerCase()).digest('hex').slice(0, 12)}`;
 
 async function tick(state, { resolve = store.resolveSource, stopped = platform.assertStopped,
-  install = store.install, getStamp = stamp } = {}) {
+  install = launcher.install, repairShortcuts = launcher.refresh, getStamp = stamp, now = Date.now } = {}) {
   return store.withLock(state, async () => {
     const config = store.readOptional(store.configPath(state));
     if (!config?.enabled) return { status: 'disabled' };
     const previous = store.readOptional(store.statusPath(state)) || {};
     const finish = (status, extra = {}) => {
-      const result = { ...previous, status, checkedAt: new Date().toISOString(), ...extra };
+      const result = { ...previous, status, checkedAt: new Date(now()).toISOString(), ...extra };
       store.saveJson(store.statusPath(state), result);
       return result;
     };
@@ -30,8 +27,10 @@ async function tick(state, { resolve = store.resolveSource, stopped = platform.a
     if (previous.rejectedStamp === currentStamp && previous.rejectedRevision === store.PATCH_REVISION) {
       return { status: 'rejected-until-next-update' };
     }
+    if (previous.retryStamp === currentStamp && previous.retryAt > now()) return { status: 'retry-pending', retryAt: previous.retryAt };
     try {
       const active = store.checkedActive(state);
+      if (active) repairShortcuts(state, active.app);
       if (active?.revision === store.PATCH_REVISION && previous.successStamp === currentStamp && previous.activeId === active.id) {
         return { status: 'idle' };
       }
@@ -39,10 +38,15 @@ async function tick(state, { resolve = store.resolveSource, stopped = platform.a
       const result = await install(source, state);
       if (!['installed', 'already-installed'].includes(result.status)) throw new Error(`Patch was not installed: ${result.status}`);
       return finish('installed', { result, activeId: store.checkedActive(state)?.id, successStamp: currentStamp,
-        rejectedStamp: null, rejectedRevision: null, error: null });
+        rejectedStamp: null, rejectedRevision: null, retryStamp: null, retryAt: null, failureCount: 0, error: null });
     } catch (error) {
       if (error.code === 'APP_RUNNING') return finish('waiting-for-exit', { error: null });
-      return finish('failed', { error: error.message, rejectedStamp: currentStamp, rejectedRevision: store.PATCH_REVISION });
+      if (['UNSUPPORTED_PATCH', 'UNSUPPORTED_UPDATER', 'UNSUPPORTED_INTEGRITY'].includes(error.code)) {
+        return finish('failed', { error: error.message, rejectedStamp: currentStamp, rejectedRevision: store.PATCH_REVISION });
+      }
+      const failureCount = previous.retryStamp === currentStamp ? Math.min((previous.failureCount || 0) + 1, 6) : 1;
+      return finish('failed', { error: error.message, code: error.code || null, rejectedStamp: null, rejectedRevision: null,
+        retryStamp: currentStamp, failureCount, retryAt: now() + Math.min(30000 * 2 ** (failureCount - 1), 900000) });
     }
   });
 }
@@ -51,17 +55,8 @@ function enable(state, source, { autoDiscover = true } = {}) {
   platform.requireWindows();
   platform.verify(source);
   store.assertSeparate(source, state);
-  const agent = path.join(state, 'agent');
-  fs.mkdirSync(agent, { recursive: true });
-  if (!store.contained(fs.realpathSync(state), fs.realpathSync(agent))) throw new Error('The worker directory must stay inside the state directory.');
-  copyRuntime(agent, 'win32');
-  const node = path.join(agent, 'node.exe');
-  platform.assertRuntime(process.execPath);
-  if (!fs.existsSync(node)) store.copyApp(process.execPath, node);
-  platform.assertRuntime(node);
-  const worker = path.join(agent, 'src/platforms/windows/cli.cjs');
-  const script = path.join(agent, 'src/platforms/windows/native.ps1');
-  const legacyScript = path.join(agent, 'windows/native.ps1');
+  const { node, worker, script } = launcher.prepare(state);
+  const legacyScript = path.join(state, 'agent/windows/native.ps1');
   const watchData = { node, worker, state };
   const config = { ...store.readOptional(store.configPath(state)), enabled: true, source, autoDiscover,
     workerId: crypto.randomUUID(), workerRevision: store.PATCH_REVISION, workerLayout: WORKER_LAYOUT, enabledAt: new Date().toISOString() };

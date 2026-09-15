@@ -103,7 +103,12 @@ async function healthCheck(app, { onProgress = () => {}, screenshot, model: requ
     async function until(fn, label, timeout = 25000) {
       const end = Date.now() + timeout;
       while (Date.now() < end) {
-        try { if (await fn()) return; }
+        try {
+          // A fresh profile can show a product announcement over settings.
+          if (await click(`Array.from(document.querySelectorAll('[role=dialog]')).find(e=>
+            e.textContent.includes('Image creation got a major upgrade'))?.querySelector('button[aria-label="Close"]')`)) continue;
+          if (await fn()) return;
+        }
         catch (error) {
           if (!/context.*destroy|Cannot read properties of null|Cannot find context/i.test(error.message)) throw error;
         }
@@ -111,7 +116,7 @@ async function healthCheck(app, { onProgress = () => {}, screenshot, model: requ
         await delay(400);
       }
       const snapshot = await evaluate('document.body?.innerText?.slice(0,2500)');
-      const controls = await evaluate('Array.from(document.querySelectorAll("button,a")).map(e=>({text:e.textContent.trim().slice(0,80),aria:e.getAttribute("aria-label"),title:e.getAttribute("title"),href:e.getAttribute("href")}))');
+      const controls = await evaluate('Array.from(document.querySelectorAll("button,a")).map(e=>({text:e.textContent.trim().slice(0,80),aria:e.getAttribute("aria-label"),title:e.getAttribute("title"),href:e.getAttribute("href"),disabled:e.disabled,ariaDisabled:e.getAttribute("aria-disabled")}))');
       onProgress({ label, snapshot, controls, diagnostics });
       throw new Error(`UI verification timed out: ${label}`);
     }
@@ -221,12 +226,25 @@ async function healthCheck(app, { onProgress = () => {}, screenshot, model: requ
       await until(() => click(`Array.from(document.querySelectorAll('button,a')).find(e=>e.textContent.trim()==='New chat')`), 'open new chat');
       await until(() => click('document.querySelector("[contenteditable=true]")'), 'new task');
       await cdp.call('Input.insertText', { text: `Reply with FAST_MODE_UI_TEST_OK (${tier}).` }, session);
+      // Auth/config queries can refresh after navigation; wait for the chosen
+      // speed to reach the visible composer before submitting a new task.
+      await until(() => evaluate(`(() => {
+        const trigger = Array.from(document.querySelectorAll('[data-composer-navigation-target="reasoning"]'))
+          .find(e => e.getBoundingClientRect().width > 0);
+        if (!trigger || trigger.disabled || trigger.getAttribute('aria-disabled') === 'true') return false;
+        const group = trigger.querySelector('[class*="ModelPickerTriggerModelLabel_"]');
+        const icon = trigger.querySelector('svg[class*="ModelPickerTriggerInlineModeIcon_"]') || group?.querySelector('svg');
+        return Boolean(icon) === ${tier === 'Fast'};
+      })()`), `${tier} composer selection`);
       const count = requests.filter(item => item.model === model).length;
       await cdp.call('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13 }, session);
       await cdp.call('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13 }, session);
       await until(() => requests.filter(item => item.model === model).length > count, `${tier} request`);
       const request = requests.filter(item => item.model === model).at(-1);
-      if (request.service_tier !== (tier === 'Fast' ? 'priority' : null)) throw new Error(`Incorrect ${tier} request tier.`);
+      if (request.service_tier !== (tier === 'Fast' ? 'priority' : null)) {
+        onProgress({ phase: 'unexpected-tier', tier, requests });
+        throw new Error(`Incorrect ${tier} request tier.`);
+      }
       await until(() => evaluate('document.body?.innerText?.split("FAST_MODE_UI_TEST_OK").length >= 3'), 'complete local response');
       await until(() => evaluate(`(() => {
         const visible = e => e.getBoundingClientRect().width > 0;
@@ -245,6 +263,13 @@ async function healthCheck(app, { onProgress = () => {}, screenshot, model: requ
     return { passed: true, model, requests, compactControls, modelEndpoint: 'loopback-mock', isolatedProfile: true,
       mockKeychain: process.platform === 'darwin' };
   } catch (error) {
+    if (screenshot && cdp && !cdp.closed && session) {
+      try {
+        const shot = await cdp.call('Page.captureScreenshot', { format: 'png' }, session);
+        const { dir, name } = path.parse(screenshot);
+        fs.writeFileSync(path.join(dir, `${name}-failure.png`), Buffer.from(shot.data, 'base64'));
+      } catch {}
+    }
     if (process.platform === 'win32') {
       const log = path.join(root, 'app.log');
       if (fs.existsSync(log)) onProgress({ phase: 'startup-log', tail: fs.readFileSync(log, 'utf8').slice(-4000) });

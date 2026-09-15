@@ -1,12 +1,28 @@
 # Windows
 
-The Windows implementation prepares a separate local Codex copy. It does not take ownership of WindowsApps, modify the Store package, register a replacement MSIX, or replace the original Start menu entry. Use `launchers/windows/Open Codex Fast.cmd` for the patched copy. Official updates, protocol handlers and file associations continue to belong to the original installation.
+The Windows implementation prepares a separate local Codex copy. It does not take ownership of WindowsApps, modify the Store package, register a replacement MSIX, or replace the official Store entry. Use the stable **Codex Fast** Start menu shortcut or `launchers/windows/Open Codex Fast.cmd` for the patched copy. Official downloads, protocol handlers and file associations continue to belong to the original installation.
+
+Each update publishes a new directory under `versions` and changes `windows-active.json` to select it. Stable shortcuts read this record when opened; old generations remain available for recovery. A repaired legacy `ChatGPT.lnk` also opens the active Fast copy, while the Store-registered ChatGPT entry opens the official app. Identical shortcut names or icons do not identify the executable. The copy normally shares the original app's personal profile and conversations, so it is not an independent user environment.
+
+## Native Update Button
+
+Patch revision 4 recognizes the Windows updater in app 26.908.40834 (8881) and retains the earlier updater support introduced in revision 3. It matches the initializer's whole-method AST fingerprint and leaves the renderer's update button, status labels, menu handlers and confirmation UI intact. The injected adapter feeds readiness and lifecycle events back to the existing update manager. An unknown updater implementation stops installation before any generation is published.
+
+The adapter checks at startup and every minute whether the registered official installation differs from the running generation, including when an old shortcut bypasses the active pointer. It does not use the official updater's package-identity APIs. A manual check with no newer local version offers to open Microsoft Store; downloading the official package still belongs to the Store.
+
+Clicking Update starts a Node helper through Windows Explorer. A directly spawned detached child did not survive Owl shutdown in real-app testing. A unique, atomically written handoff file now carries readiness and approval between the app and the independent helper. The helper validates the source and running copy and acquires the installer lock before acknowledging readiness. The app then uses its existing preparation and Quit callbacks. The helper waits for actual process exit, rediscovers the official source, installs the patched generation, repairs shortcuts and reopens the app with the same user-data directory. It restores the app's profile and home environment, including `CODEX_HOME`, without copying API keys or Node injection variables into the handoff. Cancellation before handoff leaves the app running; failures after exit attempt to reopen the previous verified copy. A persisted failure is reported in a native dialog on the next check.
+
+The Start menu shortcut launches the installed worker at its stable path and retains an extracted application icon. Default-state installation redirects recognized original-app and direct-copy `.lnk` files in the user's Start menu, Desktop and pinned-shortcut folders, including implicit taskbar shortcuts. Recognition uses executable paths and Store application identities, not shortcut names. Links with additional app arguments are preserved. Custom state directories repair only their own copy links. The worker synchronizes a stopped copy before launch, so immediately reopening the app no longer relies on the background monitor winning a polling race.
+
+Original links are backed up under `agent/shortcut-backups` before replacement. Uninstall restores their exact bytes when they still point to Fast; it preserves subsequent user changes to unrelated targets. The monitor repairs shortcuts rewritten by app startup during its regular checks and leaves unchanged links untouched. Shared all-user shortcuts and Store-generated application registrations are outside this per-user shortcut operation. A pin to the packaged Store entry needs to be replaced with the Codex Fast shortcut; changing a `.lnk` does not replace that package registration.
+
+Run a revision-4 `install.cmd` once to migrate an older installation. On **2026-09-15**, an isolated copy of the installed revision-3 app **26.901.51231 (8109)** upgraded to **26.908.40834 (8881)** through its native Update button and restarted with the same isolated profile. The personal app, active installation record and existing shortcut remained unchanged. Microsoft Store downloads were not exercised. See [tested builds](tested-builds.md) for the separate request checks and test limitations.
 
 ## Fast UI
 
 The Fast UI uses the same transformations as macOS v0.2.4 (`87060bb`), including the compact control introduced in v0.2.3 (`6d7b55f`). The collapsed model picker keeps full model names, uses the bundled filled Fast glyph, shows Ultra effort in purple, and includes the native dropdown chevron. Both recognized picker layouts retain their model, effort and service-tier selections.
 
-Windows patch revision 2 includes this UI. Run **install.cmd** or **Apply and Restart.cmd** to replace a revision-1 copy even when the official app version has not changed. An already enabled monitor is updated to the new patch code too. This UI revision has not been tested locally; the earlier test results predate it.
+Revision 4 adds reviewed fingerprints for the reorganized picker and nested model settings in app 8881. The new shared request path also permits API-key accounts to read the saved speed; its main-process and renderer copies must both match their reviewed function fingerprint. Existing Fast policy restrictions, Copilot selection and personal-access-token restrictions remain in place. It retains the same Fast glyph, full model label and compact-control transformations for older builds. Run **install.cmd** or **Apply and Restart.cmd** to update an older patch and its enabled monitor.
 
 ## Requirements
 
@@ -22,6 +38,8 @@ The standalone **install.cmd** and **uninstall.cmd** each embed the complete Win
 
 **install.cmd** runs `setup`: prepare or upgrade the local copy, install or update automatic monitoring, and open Codex. A current copy is not restarted when the original app is closed. **uninstall.cmd** runs `uninstall`: request normal Quit for local copies, disable the monitor, remove the Startup entry, delete all owned installation files, and return to the official app. The launcher uses a temporary Node copy during uninstall so an installed worker runtime does not prevent its own removal.
 
+If the previous copy or official app reopens after the new generation is published, setup finishes monitor migration and reports `restartRequired: true`. Quit that reopened app and use Codex Fast to select the new generation. Normal launch also activates an already running copy and repairs an enabled monitor left on an older revision or directory layout, without restarting the app.
+
 The README includes PowerShell commands that download and run the scripts from the latest GitHub Release. Those links require publishing `dist/install.cmd` and `dist/uninstall.cmd` as Release attachments under those exact names.
 
 In a source checkout or extracted Windows ZIP, `install.cmd` and `uninstall.cmd` are at the root. The other scripts below are in `launchers/windows` alongside their PowerShell runner. Source checkouts require `npm ci --ignore-scripts`; release packages include dependencies.
@@ -30,10 +48,10 @@ In a source checkout or extracted Windows ZIP, `install.cmd` and `uninstall.cmd`
 | --- | --- |
 | install.cmd | Install or update the copy and automatic monitoring, then open Codex |
 | uninstall.cmd | Quit local copies, remove all Fast Switch installation files, and open the original app |
-| Check Compatibility.cmd | Check publisher signatures, embedded archive hash, gate fingerprints, Fast glyph and compact picker layouts |
+| Check Compatibility.cmd | Check publisher signatures, recognized runtime integrity, gate fingerprints, Fast glyph and compact picker layouts |
 | Apply Once.cmd | Prepare a local copy; the original may remain open |
 | Apply and Restart.cmd | Restore the main window, request Quit with Ctrl+Q, wait for exit, prepare and open the copy |
-| Open Codex Fast.cmd | Verify and open the current patched copy |
+| Open Codex Fast.cmd | Verify the copy, synchronize a newer local official version when stopped, and open it |
 | Enable Automatic Fast.cmd | Register and start a per-user Startup monitor |
 | Disable Automatic Fast.cmd | Disable the monitor; preserve the active copy |
 | Restore Original App.cmd | Disable the monitor and clear the local launch target |
@@ -45,13 +63,15 @@ The equivalent CLI commands work through `node cli.cjs`. `--app` accepts a direc
 
 ## Integrity and Recovery
 
-1. Verify the original `ChatGPT.exe`, `chrome.dll` and backend `codex.exe` Authenticode signatures against OpenAI, then verify the executable's embedded ASAR header hash.
-2. Match and transform the same three gate/model functions, filled Fast glyph and compact picker layouts used on macOS. Check all 12 authentication, policy and loading combinations and the transformed UI fingerprints.
+1. Verify the original `ChatGPT.exe`, `chrome.dll` and backend `codex.exe` Authenticode signatures against OpenAI. Older Owl runtimes must also have a matching embedded ASAR header hash. A reviewed newer runtime without that resource must match a pinned EXE/DLL hash pair.
+2. Match and transform the shared gate/model functions, filled Fast glyph and compact picker layouts used on macOS. App 8881 additionally requires the saved-speed request gate in both process bundles. Check all 12 authentication, policy and loading combinations and the transformed UI fingerprints. Missing or duplicate required functions stop installation.
 3. Copy the complete app using ordinary file reads, which also handle MSIX-backed source files. Reject symlinks and junctions within the source tree.
-4. Patch archive entries and hashes. Parse the executable's `INTEGRITY` / `ELECTRONASAR` resource with `resedit`, update only the archive hash, and verify every unrelated resource and non-resource PE section is preserved. Regenerating the executable removes its invalid signature; ASAR validation stays enabled. This follows the [Electron integrity resource format](https://www.electronjs.org/docs/latest/tutorial/asar-integrity).
+4. Patch archive entries and hashes. For an embedded manifest, parse the executable's `INTEGRITY` / `ELECTRONASAR` resource with `resedit`, update only the archive hash, and verify every unrelated resource and non-resource PE section is preserved. Regenerating that executable removes its invalid signature; embedded ASAR validation stays enabled. This follows the [Electron integrity resource format](https://www.electronjs.org/docs/latest/tutorial/asar-integrity). For the reviewed newer Owl layout, leave the EXE and DLL unchanged and retain their official signatures. Missing or duplicate resources in other runtimes remain errors.
 5. Recheck the original and candidate, then publish the complete generation by renaming a flushed JSON record. A failed or interrupted preparation cannot replace the previous target. Launch verifies the recorded hashes before opening the copy.
 
-The local executable is unsigned. No certificate is installed and no system verification policy is changed. Windows application-control policies may block it. Store-only features such as updater integration, file associations, notifications, OAuth callbacks and sandbox setup can differ outside the package; they are not all validated by the Fast workflow test.
+The older layout produces an unsigned local executable; the reviewed newer Owl layout preserves the signed executable. No certificate is installed and no system verification policy is changed. Windows application-control policies may block local copies. Native update UI is connected to Fast Switch's own copy updater; official MSIX updating, file associations, notifications, OAuth callbacks and sandbox setup can differ outside the package and are not all validated by the Fast workflow test.
+
+App 26.908.40834 (8881) removed the old embedded resource. Revision-3 tools stop with `Cannot uniquely identify the Windows ASAR integrity resource` when this official version is installed. Update the Fast Switch tools with the current `install.cmd`; no original-app repair or removal of Codex user data is needed. Unknown runtime pairs remain rejected until reviewed.
 
 Restore does not copy an older version over a newer official update. **Restore Original App.cmd** clears the local launch target while retaining local generations. **uninstall.cmd** validates generation records, waits for the monitor to exit, and removes `versions`, `agent`, configuration, logs and the empty state directory. Cleanup stays inside the recorded installation directory and rejects unexpected items or redirected paths. It does not depend on the active launch pointer being intact. The original app and its personal profile remain unchanged.
 
@@ -63,16 +83,17 @@ State is in `%LOCALAPPDATA%\Codex Fast Switch` by default:
 windows.json          configuration
 windows-active.json   active local generation
 windows-status.json   last check / operation
+windows-update.json   in-app update handoff and result
 windows-monitor.log   unexpected worker errors
 versions/<id>/app/    complete local copies
 agent/                stable worker code and copied Node runtime
 ```
 
-The Startup shortcut has a name derived from the state path. It starts the worker hidden at login. The worker polls every 10 seconds and waits until the source and current copy are both closed. An unsupported build is rejected once until its files change, the patch revision changes, or monitoring is enabled again. A live installer lock excludes another installer; a separate worker lock prevents duplicate monitors. Disable takes effect by the next poll.
+The Startup shortcut has a name derived from the state path. It starts the worker hidden at login. The worker polls every 10 seconds and waits until the source and current copy are both closed. Unrecognized patch or updater structures are rejected until their files or the patch revision change, or monitoring is enabled again. Other failures retry with exponential backoff from 30 seconds to 15 minutes. Failed staging copies are removed while their recovery records remain. A live installer lock excludes another installer; a separate worker lock prevents duplicate monitors. Disable takes effect by the next poll.
 
 Worker code is under `agent/src`, with the copied runtime still at `agent/node.exe`. Setup rewrites older Startup entries to `agent/src/platforms/windows/native.ps1`. Both setup and uninstall recognize the earlier `agent/windows/native.ps1` entry. A separate `workerLayout` field refreshes an enabled monitor after a directory-layout change even when the app patch revision is unchanged. Existing generations, state paths and personal Codex data retain their locations; full uninstall also removes older files remaining under `agent`.
 
-Failed operations record their phase, error code and message in `windows-status.json`. Native Windows errors are returned as structured data so the CLI can show the actual cause.
+Failed operations record their phase, error code and message in `windows-status.json`; in-app updates also keep `windows-update.json`. Native Windows errors are returned as structured data so the CLI can show the actual cause. Full uninstall removes the update record, the stable launcher and matching copy shortcuts along with the other owned installation files.
 
 Backups and state must remain trusted and local. Local generations consume disk space until **uninstall.cmd** removes the installation. Backups are not needed afterward because a reinstall copies the official app again. The package itself contains only this project's code and npm dependencies; official application binaries are copied from the user's installation at runtime.
 
@@ -89,6 +110,14 @@ Optional local integration test (keep the original app running, and use an isola
 ```powershell
 npm run test:windows:integration -- "C:\temporary\fast-switch-test"
 ```
+
+The native update test creates and removes its own app copies, Codex home and browser profile. The selected official source must be stopped; a personal Fast copy may keep running. It retains screenshots and a JSON report in the supplied artifact directory:
+
+```powershell
+node test/integration/windows/updates.cjs "C:\path\to\official\app" "C:\temporary\update-test-results"
+```
+
+By default, this tests a same-version source change through the real native button and installer. Add the previous Fast installation's state directory as the third argument to test a cross-version upgrade. The harness copies that installed app into a disposable generation and changes only its updater binding to the test state; it never launches the personal profile. This mode also probes Fast/Standard requests after the upgrade. It does not download or install a Store package. Normal background initialization is allowed; model configuration uses a dummy key and loopback mock. Cleanup targets only executables inside the freshly created test directory and checks the existing personal installation afterward.
 
 It prepares a copy, registers a temporary Startup worker, checks waiting-for-exit and worker replacement, disables the worker, removes its shortcut and restores the original launch target. It never requests that the original app quit.
 

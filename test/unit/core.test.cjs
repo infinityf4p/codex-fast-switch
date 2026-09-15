@@ -3,9 +3,11 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
+const vm = require('node:vm');
 const asar = require('@electron/asar');
 const walk = require('acorn-walk');
 const { PassThrough } = require('node:stream');
+const { finished } = require('node:stream/promises');
 const { EventEmitter } = require('node:events');
 const adaptive = require('../../src/core/adaptive.cjs');
 const { patchArchive, sha256 } = require('../../src/core/archive.cjs');
@@ -49,6 +51,50 @@ test('unexpected patched fingerprints are rejected', () => {
   assert.throws(() => adaptive.adapt(snippets.join('\n'), recipes.map(recipe => ({ ...recipe, patchedFingerprint: 'invalid' }))), /Unexpected transformed/);
 });
 
+test('model recipe variants use the selected model from nested model settings', () => {
+  const source = 'function models(host,selection){const {modelSettings:settings}=selection;const serviceTierForRequest=null;return getModels(host);}';
+  const expected = source.replace('getModels(host)', 'getModels({...host,additionalAvailableModels:new Set([settings.model])})');
+  const fn = adaptive.parse(source).body[0];
+  const variant = { kind: 'models', fingerprint: adaptive.shape(fn).fingerprint,
+    patchedFingerprint: adaptive.shape(adaptive.parse(expected).body[0]).fingerprint,
+    path: ['body', 'body', 2, 'argument', 'arguments', 0],
+    modelSettingsPath: ['body', 'body', 0, 'declarations', 0, 'id', 'properties', 0, 'value'], environment: [] };
+  const alternatives = [...recipes, variant];
+  const result = adaptive.adapt(source, alternatives);
+  assert.equal(result.matches.length, 1);
+  const context = vm.createContext({ getModels: options => options });
+  vm.runInContext(result.patched, context);
+  for (const model of ['first-model', 'another-model']) {
+    context.selection = { model: 'wrong-level', modelSettings: { model } };
+    const options = vm.runInContext('models({hostId:"local",conversationId:"existing"},selection)', context);
+    assert.deepEqual([...options.additionalAvailableModels], [model]);
+    assert.equal(options.hostId, 'local');
+    assert.equal(options.conversationId, 'existing');
+  }
+  assert.equal(adaptive.adapt(snippets[2], alternatives).matches.length, 1);
+  assert.equal(adaptive.adapt(source.replace('serviceTierForRequest=null', 'serviceTierForRequest="changed"'), alternatives).matches.length, 0);
+});
+
+test('saved default speed accepts API keys while retaining other authentication and policy restrictions', async () => {
+  const source = 'function saved(client,adapters){return {async readServiceTier(){if(adapters.copilot)return false;const info=await client.account();const method=await client.method();return method!=="personalAccessToken"&&info.account?.type==="chatgpt"&&client.requirements.fast_mode!==false;}}}';
+  const expected = source.replace('info.account?.type==="chatgpt"', '(info.account?.type==="chatgpt"||info.account?.type==="apiKey")');
+  const fn = adaptive.parse(source).body[0];
+  let target;
+  walk.simple(fn, { BinaryExpression(node) { if (node.right.value === 'chatgpt') target = node; } });
+  const recipe = { kind: 'saved-request', optional: true, fingerprint: adaptive.shape(fn).fingerprint,
+    patchedFingerprint: adaptive.shape(adaptive.parse(expected).body[0]).fingerprint,
+    path: adaptive.nodePath(fn, target), environment: [] };
+  const result = adaptive.adapt(source, [recipe]);
+  assert.equal(result.matches.length, 1);
+  for (const account of ['apiKey', 'chatgpt', 'other', null]) for (const blocked of [false, true])
+    for (const copilot of [false, true]) for (const token of [false, true]) {
+      const context = vm.createContext({ client: { account: async () => ({ account: account == null ? null : { type: account } }),
+        method: async () => token ? 'personalAccessToken' : 'apikey', requirements: { fast_mode: !blocked } }, adapters: { copilot } });
+      const allowed = await vm.runInContext(`(${result.patched})(client,adapters).readServiceTier()`, context);
+      assert.equal(allowed, ['apiKey', 'chatgpt'].includes(account) && !blocked && !copilot && !token);
+    }
+});
+
 test('split and renamed chunks are patched with integrity hashes and unrelated bytes preserved', async t => {
   const root = temporary(t);
   const source = path.join(root, 'source');
@@ -59,6 +105,8 @@ test('split and renamed chunks are patched with integrity hashes and unrelated b
   const archive = path.join(root, 'app.asar');
   await asar.createPackage(source, archive);
   const plan = await adaptive.planArchive(archive, recipes);
+  await assert.rejects(adaptive.planArchive(archive, recipes.map(recipe => recipe.kind === 'models'
+    ? { ...recipe, requires: ['saved-request'] } : recipe)), /Cannot uniquely recognize saved-request/);
   assert.equal(plan.targets.length, 3);
   assert.equal(plan.checks.length, 12);
   for (const target of plan.targets) patchArchive(archive, target.entry, () => target.patched);
@@ -85,6 +133,28 @@ test('missing or damaged archive entries cannot be patched', async t => {
   data[data.length - 1] ^= 1;
   fs.writeFileSync(archive, data);
   assert.throws(() => patchArchive(archive, 'test.js', bytes => bytes), /integrity mismatch/);
+});
+
+test('shared request gates require exactly one recognized copy in each declared process scope', async t => {
+  const root = temporary(t), source = path.join(root, 'source'), archive = path.join(root, 'app.asar');
+  fs.mkdirSync(path.join(source, 'webview'), { recursive: true });
+  fs.mkdirSync(path.join(source, '.vite/build'), { recursive: true });
+  fs.writeFileSync(path.join(source, 'webview/app.js'), snippets.join('\n'));
+  const scoped = recipes.map(recipe => recipe.kind === 'request' ? { ...recipe, scopes: ['webview', 'main'] } : recipe);
+  const pack = async () => finished(await asar.createPackage(source, archive));
+  await pack();
+  await assert.rejects(adaptive.planArchive(archive, scoped), /request logic in main/);
+  fs.writeFileSync(path.join(source, '.vite/build/request.js'), snippets[1]);
+  await pack();
+  const plan = await adaptive.planArchive(archive, scoped);
+  assert.equal(plan.targets.length, 2);
+  for (const target of plan.targets) {
+    patchArchive(archive, target.entry, () => target.patched);
+    assert.match(asar.extractFile(archive, target.entry).toString(), /apikey/);
+  }
+  fs.writeFileSync(path.join(source, '.vite/build/duplicate.js'), snippets[1]);
+  await pack();
+  await assert.rejects(adaptive.planArchive(archive, scoped), /request logic in main/);
 });
 
 test('live locks exclude a second installer and abandoned locks are recovered', async t => {

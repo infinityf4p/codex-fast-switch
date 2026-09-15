@@ -3,12 +3,13 @@ const path = require('node:path');
 const crypto = require('node:crypto');
 const platform = require('./platform.cjs');
 const integrity = require('./integrity.cjs');
+const updater = require('./updater.cjs');
 const { planArchive } = require('../../core/adaptive.cjs');
 const { patchArchive, sha256 } = require('../../core/archive.cjs');
 const { saveJson, readJson, withLock } = require('../../core/state.cjs');
 
 const PATCH_ID = 'codex-fast-switch-windows-v1';
-const PATCH_REVISION = 2;
+const PATCH_REVISION = 4;
 const configPath = state => path.join(state, 'windows.json');
 const activePath = state => path.join(state, 'windows-active.json');
 const statusPath = state => path.join(state, 'windows-status.json');
@@ -80,7 +81,7 @@ function copyApp(source, target) {
 // Each generation is immutable after publication. One JSON rename publishes it;
 // interruption during copying or patching leaves the previous target available.
 async function install(source, state, { onPhase = () => {}, verify = platform.verify, plan = planArchive,
-  stopped = platform.assertStopped, copy = copyApp } = {}) {
+  stopped = platform.assertStopped, copy = copyApp, planUpdater = updater.planArchive } = {}) {
   state = path.resolve(state);
   source = platform.normalizeApp(source);
   assertSeparate(source, state);
@@ -98,13 +99,21 @@ async function install(source, state, { onPhase = () => {}, verify = platform.ve
     }
   }
   onPhase('recognizing');
-  const prepared = await plan(platform.archivePath(source));
   const id = `${Date.now()}-${crypto.randomUUID()}`;
+  let prepared;
+  try {
+    prepared = await plan(platform.archivePath(source));
+    prepared.targets = [...prepared.targets, ...await planUpdater(platform.archivePath(source), { state, id })];
+  } catch (error) {
+    if (!error.code) error.code = 'UNSUPPORTED_PATCH';
+    throw error;
+  }
   const directory = path.join(state, 'versions', id);
   const app = path.join(directory, 'app');
   fs.mkdirSync(directory, { recursive: true });
   if (!contained(fs.realpathSync(state), fs.realpathSync(directory))) throw new Error('The versions directory must stay inside the state directory.');
-  const record = { patchId: PATCH_ID, revision: PATCH_REVISION, id, app, source, original, ...info, phase: 'staging' };
+  const record = { patchId: PATCH_ID, revision: PATCH_REVISION, id, app, source, original,
+    sourceStamp: platform.stamp(source), ...info, phase: 'staging' };
   const journal = path.join(directory, 'record.json');
   saveJson(journal, record);
   try {
@@ -139,7 +148,15 @@ async function install(source, state, { onPhase = () => {}, verify = platform.ve
   } catch (error) {
     record.phase = 'failed';
     record.error = error.message;
-    saveJson(journal, record);
+    // Retryable copy failures must not retain gigabytes of incomplete application data.
+    try {
+      if (checkedActive(state)?.id !== id && fs.existsSync(app) && !fs.lstatSync(app).isSymbolicLink() &&
+          contained(fs.realpathSync(directory), fs.realpathSync(app))) {
+        fs.rmSync(app, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 });
+      }
+    } catch (cleanupError) { record.cleanupError = cleanupError.message; }
+    try { saveJson(journal, record); }
+    catch (recordError) { error.message += ' Could not record failure: ' + recordError.message; }
     throw error;
   }
 }
@@ -153,8 +170,9 @@ function restore(state, { stopped = platform.assertStopped } = {}) {
 async function doctor(source) {
   const info = platform.verify(source);
   const prepared = await planArchive(platform.archivePath(source));
+  const targets = [...prepared.targets, ...updater.planArchive(platform.archivePath(source), {})];
   return { status: 'recognized', app: source, ...info, mode: 'local-copy', originalUnchanged: true, gateCases: prepared.checks.length,
-    targets: prepared.targets.map(target => ({ entry: target.entry.replaceAll('\\', '/'), kinds: target.kinds })) };
+    targets: targets.map(target => ({ entry: target.entry.replaceAll('\\', '/'), kinds: target.kinds })) };
 }
 module.exports = { PATCH_ID, PATCH_REVISION, configPath, activePath, statusPath, readOptional, checkedActive, status, resolveSource,
   contained, assertSeparate, copyApp, install, restore, doctor, saveJson, withLock };

@@ -1,6 +1,6 @@
 param(
     [Parameter(Mandatory = $true)]
-    [ValidateSet('discover', 'signature', 'processes', 'quit', 'open', 'enable', 'disable', 'start-watch')]
+    [ValidateSet('discover', 'signature', 'processes', 'quit', 'open', 'enable', 'disable', 'start-watch', 'shortcuts', 'remove-shortcuts', 'launch', 'start-update')]
     [string]$Action,
     [string]$Payload = 'e30='
 )
@@ -28,6 +28,10 @@ function Test-MonitorShortcut($shortcut) {
         }
     }
     return $false
+}
+
+function Quote-ProcessArgument([string]$value) {
+    '"' + [Regex]::Replace([Regex]::Replace($value, '(\\*)"', '$1$1\"'), '(\\+)$', '$1$1') + '"'
 }
 
 try { switch ($Action) {
@@ -79,10 +83,31 @@ try { switch ($Action) {
             if (-not $item.WaitForExit(10000)) { break }
         }
     }
-    'open' { Start-Process -FilePath $data.binary -WorkingDirectory ([IO.Path]::GetDirectoryName($data.binary)) | Out-Null }
+    'open' {
+        $start = @{ FilePath = $data.binary; WorkingDirectory = [IO.Path]::GetDirectoryName($data.binary) }
+        if ($data.userData) { $start.ArgumentList = Quote-ProcessArgument ('--user-data-dir=' + $data.userData) }
+        Start-Process @start | Out-Null
+    }
+    'shortcuts' { . (Join-Path $PSScriptRoot 'shortcuts.ps1'); Update-AppShortcuts $data $false }
+    'remove-shortcuts' { . (Join-Path $PSScriptRoot 'shortcuts.ps1'); Update-AppShortcuts $data $true }
+    'launch' {
+        $previousPreference = $ErrorActionPreference
+        try {
+            $ErrorActionPreference = 'Continue'
+            $output = & $data.node $data.worker launch --state $data.state 2>&1
+            $exitCode = $LASTEXITCODE
+        } finally { $ErrorActionPreference = $previousPreference }
+        if ($exitCode -ne 0) { throw (($output | Out-String).Trim()) }
+    }
     'start-watch' {
         $arguments = '"' + $data.worker + '" watch --state "' + $data.state + '"'
         Start-Process -FilePath $data.node -ArgumentList $arguments -WindowStyle Hidden -WorkingDirectory $data.state | Out-Null
+    }
+    'start-update' {
+        $arguments = (@($data.worker, 'install', $data.state, $data.id, $data.token) | ForEach-Object { Quote-ProcessArgument $_ }) -join ' '
+        # Explorer owns this process so Owl shutdown cannot terminate the update worker.
+        $shell = New-Object -ComObject Shell.Application
+        $shell.ShellExecute($data.node, $arguments, $data.state, 'open', 0)
     }
     'enable' {
         $startup = [Environment]::GetFolderPath('Startup')
@@ -115,6 +140,10 @@ try { switch ($Action) {
 } } catch {
     $cause = $_.Exception
     while ($cause.InnerException) { $cause = $cause.InnerException }
+    if ($Action -eq 'launch') {
+        Add-Type -AssemblyName System.Windows.Forms
+        [void][Windows.Forms.MessageBox]::Show($cause.Message, 'Codex Fast')
+    }
     @{ error = @{ code = 'WINDOWS_NATIVE_FAILED'; message = $cause.Message; action = $Action } } | ConvertTo-Json -Depth 3 -Compress
     exit 1
 }
