@@ -48,7 +48,7 @@ $data = [pscustomobject]@{ state=$state; binary=$powershell; shortcutName='Codex
     officialBinaries=@($official); appIds=@($appId); maintenance=$false }
 $roots = @($programs, $desktop, (Join-Path $Root 'Pins'))
 $installed = Update-AppShortcuts $data $false $roots $programs | ConvertFrom-Json
-Assert-True ($installed.updated.Count -eq 5) 'Expected the original, copy, Store link, additional original and primary to be redirected.'
+Assert-True ($installed.updated.Count -eq 5) ('Expected the original, copy, Store link, additional original and primary to be redirected. Observed: ' + ($installed | ConvertTo-Json -Depth 3 -Compress))
 Assert-True ($installed.skipped -contains $customLink) 'A custom profile must be reported as preserved.'
 Assert-True ((Link-Hash $customLink) -eq $customHash) 'Custom profile arguments changed.'
 Assert-True ((Link-Hash $customCopyLink) -eq $customCopyHash) 'Copy profile arguments changed during installation.'

@@ -9,7 +9,9 @@ const automatic = require('../../src/platforms/windows/automatic.cjs');
 
 test('Windows shortcut conversion repairs drift and restores original links without overwriting custom launches',
   { skip: process.platform !== 'win32' }, t => {
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'codex-fast-shortcuts-'));
+    // Windows runners can expose TEMP through an 8.3 alias; Shell COM returns
+    // long paths. The native resolver expands aliases that realpathSync retains.
+    const root = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'codex-fast-shortcuts-')));
     t.after(() => fs.rmSync(root, { recursive: true, force: true, maxRetries: 3 }));
     const result = spawnSync(path.join(process.env.SystemRoot, 'System32/WindowsPowerShell/v1.0/powershell.exe'),
       ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', path.join(__dirname, '../support/windows-shortcuts.ps1'),
