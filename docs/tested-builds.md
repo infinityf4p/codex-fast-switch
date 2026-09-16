@@ -1,5 +1,11 @@
 # Tested builds
 
+## 2026-09-16: repeated Windows update prompt
+
+On the personal **26.908.40834 (8881)** installation, the native updater completed with the same active generation but continued reporting an update. The official files matched the installed original fingerprints; only the change timestamp of the 104-byte `owl-shell-runtime.json` file differed. Timestamp changes now trigger content comparison for the affected files instead of marking the build as new.
+
+The regression reproduced the false positive before the fix. The **30 Windows update and installation tests** then passed, including unchanged content, repeated checks, changed content with the same version, and records without a saved stamp. Source and PowerShell syntax checks passed. Deploying the corrected helper changed the real check from `available: true` to `available: false` without changing the running app process, active generation, installation records, configuration or official/patched app fingerprints. No native update or app restart was triggered during this repair.
+
 ## 2026-09-16: Windows application icons
 
 On Windows x64 with app **26.908.40834 (8881)**, the shortcut's extracted icon contained only one 32px image and appeared distorted on the taskbar. The native window icon already matched the official artwork. Shortcuts now use the official themed ICO files byte-for-byte; both light and dark selections retained all **15 resolutions**. Theme selection was exercised without changing the personal Windows theme.

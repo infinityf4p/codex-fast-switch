@@ -4,6 +4,7 @@ const crypto = require('node:crypto');
 const platform = require('./platform.cjs');
 const store = require('./store.cjs');
 const launcher = require('./launcher.cjs');
+const { sha256 } = require('../../core/archive.cjs');
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 const jobPath = state => path.join(state, 'windows-update.json');
 
@@ -20,13 +21,27 @@ function recordFor(state, id) {
   return record;
 }
 
+function hasSourceChanges(source, running, currentStamp) {
+  if (running.sourceStamp === currentStamp) return false;
+  const files = platform.identityFiles();
+  let previous, current;
+  try { previous = JSON.parse(running.sourceStamp); current = JSON.parse(currentStamp); } catch {}
+  const valid = value => Array.isArray(value) && value.length === files.length + 1 && value[0] === source &&
+    value.slice(1).every(stats => Array.isArray(stats) && stats.length === 3 && stats.every(Number.isFinite));
+  if (!valid(previous) || !valid(current)) return !platform.same(source, running.original);
+  // Runtime initialization can change file timestamps without changing the installed build.
+  // Hash only files with changed metadata so polling does not reread every large binary.
+  return files.some((file, index) => JSON.stringify(previous[index + 1]) !== JSON.stringify(current[index + 1]) &&
+    sha256(fs.readFileSync(path.join(source, file))) !== running.original[file]);
+}
+
 function check(state, id, { resolve = store.resolveSource, metadata = platform.metadata, stamp = platform.stamp } = {}) {
   const running = recordFor(state, id);
   const source = resolve(state);
   const info = metadata(source);
   if (running.arch !== info.arch) throw new Error('The official app architecture changed. Run install.cmd again.');
   const available = running.source !== source || running.version !== info.version || running.build !== info.build ||
-    running.revision !== store.PATCH_REVISION || (running.sourceStamp != null && running.sourceStamp !== stamp(source));
+    running.revision !== store.PATCH_REVISION || hasSourceChanges(source, running, stamp(source));
   const job = store.readOptional(jobPath(state));
   return { available, version: info.version, build: info.build, source,
     failure: job?.status === 'failed' && job.fromId === id ? { id: job.id, error: job.error } : null };

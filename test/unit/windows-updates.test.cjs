@@ -168,6 +168,42 @@ test('checks compare the running generation even when the active pointer has adv
   assert.throws(() => updates.recordFor(f.state, '../escape'), /Invalid update generation/);
 });
 
+test('timestamp-only source changes do not offer the same update again', t => {
+  const f = fixture(t);
+  for (const file of platform.identityFiles()) {
+    const target = path.join(f.source, file);
+    fs.mkdirSync(path.dirname(target), { recursive: true });
+    fs.writeFileSync(target, 'original ' + file);
+  }
+  f.running.original = platform.fingerprint(f.source);
+  f.running.sourceStamp = platform.stamp(f.source);
+  const journal = path.join(f.state, 'versions', f.running.id, 'record.json');
+  store.saveJson(journal, f.running);
+  const check = () => updates.check(f.state, f.running.id, { resolve: () => f.source,
+    metadata: () => ({ arch: 'x64', version: '1', build: '1' }) });
+  assert.equal(check().available, false);
+
+  const runtime = path.join(f.source, 'owl-shell-runtime.json');
+  const original = fs.readFileSync(runtime);
+  const modified = fs.statSync(runtime).mtimeMs + 10000;
+  fs.utimesSync(runtime, new Date(modified), new Date(modified));
+  assert.notEqual(platform.stamp(f.source), f.running.sourceStamp);
+  assert.equal(check().available, false);
+  assert.equal(check().available, false);
+
+  // A republished build with changed content must still be offered, even with the same version.
+  fs.appendFileSync(runtime, ' changed');
+  assert.equal(check().available, true);
+  fs.writeFileSync(runtime, original);
+  assert.equal(check().available, false);
+
+  delete f.running.sourceStamp;
+  store.saveJson(journal, f.running);
+  assert.equal(check().available, false);
+  fs.appendFileSync(path.join(f.source, 'chrome.dll'), ' changed');
+  assert.equal(check().available, true);
+});
+
 test('update installation waits for exit before publishing and reopening the new generation', async t => {
   const f = fixture(t), events = [];
   let exited = false;
