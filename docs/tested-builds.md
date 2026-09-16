@@ -1,5 +1,11 @@
 # Tested builds
 
+## 2026-09-16: Windows application icons
+
+On Windows x64 with app **26.908.40834 (8881)**, the shortcut's extracted icon contained only one 32px image and appeared distorted on the taskbar. The native window icon already matched the official artwork. Shortcuts now use the official themed ICO files byte-for-byte; both light and dark selections retained all **15 resolutions**. Theme selection was exercised without changing the personal Windows theme.
+
+The repaired shortcuts and a Shell icon-cache notification visibly restored the running taskbar icon. The active generation, monitor configuration, official and patched app fingerprints, and app process IDs were unchanged. The app was not restarted. Source/PowerShell checks, both existing Windows shortcut tests, and Windows installer packaging passed.
+
 ## 2026-09-15: Windows 8881 compatibility and cross-version update
 
 Verification used Windows x64, installed Store package **26.908.4834.0**, app **26.908.40834 (8881)** and Windows patch revision **4**. The previous personal Fast copy was **26.901.51231 (8109)**, revision **3**.

@@ -22,6 +22,34 @@ function Get-ShortcutHash([byte[]]$bytes) {
     finally { $algorithm.Dispose() }
 }
 
+function Get-AppShortcutIcon([string]$binary, [string]$agent) {
+    $theme = Get-ItemProperty -LiteralPath 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize' -ErrorAction SilentlyContinue
+    $variant = if ($null -ne $theme.SystemUsesLightTheme -and $theme.SystemUsesLightTheme -eq 0) { 'dark' } else { 'light' }
+    $resources = Join-Path ([IO.Path]::GetDirectoryName($binary)) 'resources'
+    $source = @((Join-Path $resources ('chatgpt-app-' + $variant + '.ico')), (Join-Path $resources 'icon-chatgpt.ico')) |
+        Where-Object { Test-Path -LiteralPath $_ -PathType Leaf } | Select-Object -First 1
+    if ($source) {
+        # Keep the official artwork, alpha channel and every resolution intact.
+        $bytes = [IO.File]::ReadAllBytes($source)
+    } else {
+        Add-Type -AssemblyName System.Drawing
+        $image = [Drawing.Icon]::ExtractAssociatedIcon($binary)
+        if (-not $image) { throw 'The application icon could not be read.' }
+        $output = New-Object IO.MemoryStream
+        try { $image.Save($output); $bytes = $output.ToArray() } finally { $output.Dispose(); $image.Dispose() }
+    }
+    # A new path prevents Explorer from retaining an older icon after an update or theme change.
+    $hash = Get-ShortcutHash $bytes
+    $icon = Join-Path $agent ('Codex Fast-' + $hash + '.ico')
+    if ((Test-Path -LiteralPath $icon) -and ((Get-Item -LiteralPath $icon -Force).Attributes -band [IO.FileAttributes]::ReparsePoint)) {
+        throw 'The application icon is redirected.'
+    }
+    if (-not (Test-Path -LiteralPath $icon) -or (Get-ShortcutHash ([IO.File]::ReadAllBytes($icon))) -cne $hash) {
+        [IO.File]::WriteAllBytes($icon, $bytes)
+    }
+    return $icon
+}
+
 function Update-AppShortcuts($data, [bool]$remove, [string[]]$roots = @(), [string]$programs = '') {
     $state = [IO.Path]::GetFullPath($data.state).TrimEnd('\')
     $agent = Join-Path $state 'agent'
@@ -36,7 +64,6 @@ function Update-AppShortcuts($data, [bool]$remove, [string[]]$roots = @(), [stri
             (Join-Path $env:APPDATA 'Microsoft\Internet Explorer\Quick Launch\User Pinned')) | Where-Object { $_ }
     }
     $primary = Join-Path $programs ($data.shortcutName + '.lnk')
-    $icon = Join-Path $agent 'Codex Fast.ico'
     $backups = Join-Path $agent 'shortcut-backups'
     foreach ($directory in @($agent, $backups)) {
         if ((Test-Path -LiteralPath $directory) -and ((Get-Item -LiteralPath $directory -Force).Attributes -band [IO.FileAttributes]::ReparsePoint)) {
@@ -73,16 +100,7 @@ function Update-AppShortcuts($data, [bool]$remove, [string[]]$roots = @(), [stri
     }
     $result = @{ updated = @(); restored = @(); removed = @(); skipped = @() }
     if (-not $remove) {
-        if (-not $data.maintenance -or -not (Test-Path -LiteralPath $icon)) {
-            Add-Type -AssemblyName System.Drawing
-            $image = [Drawing.Icon]::ExtractAssociatedIcon($data.binary)
-            if (-not $image) { throw 'The application icon could not be read.' }
-            $output = New-Object IO.MemoryStream
-            try { $image.Save($output); $bytes = $output.ToArray() } finally { $output.Dispose(); $image.Dispose() }
-            if (-not (Test-Path -LiteralPath $icon) -or (Get-ShortcutHash ([IO.File]::ReadAllBytes($icon))) -cne (Get-ShortcutHash $bytes)) {
-                [IO.File]::WriteAllBytes($icon, $bytes)
-            }
-        }
+        $icon = Get-AppShortcutIcon $data.binary $agent
         $paths += $primary
     }
     foreach ($file in @($paths | Select-Object -Unique)) {
@@ -163,6 +181,21 @@ function Update-AppShortcuts($data, [bool]$remove, [string[]]$roots = @(), [stri
             if (Test-Path -LiteralPath $temporaryLink) { Remove-Item -LiteralPath $temporaryLink }
         }
         $result.updated += $file
+    }
+    if ($result.updated.Count -or $result.restored.Count -or $result.removed.Count) {
+        # A running taskbar group caches the shortcut icon beyond individual file notifications.
+        if (-not ('CodexFastShortcutIcons' -as [type])) {
+            Add-Type -TypeDefinition @'
+using System;
+using System.Runtime.InteropServices;
+public static class CodexFastShortcutIcons {
+    [DllImport("shell32.dll")]
+    public static extern void SHChangeNotify(uint events, uint flags, IntPtr item1, IntPtr item2);
+}
+'@
+        }
+        # SHCNE_ASSOCCHANGED with SHCNF_FLUSHNOWAIT invalidates the Shell's icon cache without restarting it.
+        [CodexFastShortcutIcons]::SHChangeNotify(0x08000000, 0x2000, [IntPtr]::Zero, [IntPtr]::Zero)
     }
     $result | ConvertTo-Json -Depth 3 -Compress
 }
