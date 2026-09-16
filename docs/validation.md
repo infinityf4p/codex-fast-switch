@@ -14,6 +14,12 @@ Both compact model control variants require reviewed original and transformed fu
 
 The installer clones the bundle, updates ASAR integrity, signs locally, and exchanges complete bundles while retaining the original. It checks the file identity during exchange to avoid overwriting an unrelated update. It has no fixed stability timer and does not launch a test app or call a model API.
 
+Revision 6 also recognizes the asynchronous macOS Sparkle initialization and loads a small native hook through the app's bundled Objective-C bridge. With Sparkle **2.9.1**, the hook only clears the stage-2 message's relaunch byte after an independent worker acknowledges startup. The official host path, quit request, update installation and progress flag are preserved. The worker waits for the original process and official updater to exit, applies the patch, then opens the same app. A rejected patch reopens the retained original before showing the error. A pending recovery is not launched.
+
+This uses a private Sparkle message format, gated by its framework version and Objective-C method signature. An unknown Sparkle version or unavailable worker keeps the official relaunch and the existing background restart fallback. A changed JavaScript initialization that cannot be recognized rejects the patch. `status` includes the last runtime hook result and process ID; it is not a guarantee about a future update. No separate launcher is required for normal app use.
+
+The transformed functions are parsed and fingerprinted individually; their surrounding unchanged chunk is not parsed a second time. Signing performs one final deep verification of the candidate. The small, local eligibility checks remain; installation does not run the development test suite.
+
 From 0.2.4, signing uses a persistent local certificate and an explicit certificate-bound designated requirement. Setup prepares this identity before quitting the app. Identity loss or mismatch fails without silently replacing the certificate. [Local signing](local-signing.md) describes storage, initial Keychain authorization and the isolated authorization-reuse test.
 
 ## Optional developer UI test

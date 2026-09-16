@@ -159,9 +159,33 @@ function ensureIdentity(state, { expectedCertificateSha256 } = {}) {
     keychain: identity.keychain };
 }
 
+function sparkleTargets(app) {
+  const root = path.join(app, 'Contents/Frameworks/Sparkle.framework');
+  if (!fs.existsSync(root)) return [];
+  const versioned = fs.existsSync(path.join(root, 'Versions/B')) ? path.join(root, 'Versions/B') : root;
+  return [
+    path.join(versioned, 'XPCServices/Downloader.xpc'),
+    path.join(versioned, 'XPCServices/Installer.xpc'),
+    path.join(versioned, 'Updater.app'),
+    path.join(versioned, 'Autoupdate'),
+    root,
+  ].filter(target => fs.existsSync(target));
+}
+
+function signNested(target, identity) {
+  execFileSync('/usr/bin/codesign', ['--force', '--sign', identity.certificateSha1, '--keychain', identity.keychain,
+    '--timestamp=none', '--preserve-metadata=identifier,entitlements,flags,runtime', target], { stdio: 'pipe' });
+}
+
 function sign(target, state, { identifier = 'com.openai.codex', entitlements, options = 'runtime', expectedCertificateSha256 } = {}) {
   const identity = ensureIdentity(state, { expectedCertificateSha256 });
   const requirement = requirementFor(identifier, identity.certificateSha1);
+  // Sparkle refuses to update when Autoupdate still has OpenAI's team ID and the app does not.
+  for (const nested of sparkleTargets(target)) signNested(nested, identity);
+  const updateHook = path.join(target, 'Contents/Resources/codex-fast-update-hook.dylib');
+  if (fs.existsSync(updateHook)) signNested(updateHook, identity);
+  const storageBridge = path.join(target, 'Contents/Resources/cfs-storage.dylib');
+  if (fs.existsSync(storageBridge)) signNested(storageBridge, identity);
   execFileSync('/usr/bin/codesign', ['--force', '--sign', identity.certificateSha1, '--keychain', identity.keychain,
     '--identifier', identifier, '--timestamp=none', '--requirements', `=designated => ${requirement}`,
     ...(options ? ['--options', options] : []), ...(entitlements ? ['--entitlements', entitlements] : []), target], { stdio: 'pipe' });
@@ -169,4 +193,4 @@ function sign(target, state, { identifier = 'com.openai.codex', entitlements, op
   return { certificateSha256: identity.certificateSha256, requirement };
 }
 
-module.exports = { ensureIdentity, readIdentity, requirementFor, sign };
+module.exports = { ensureIdentity, readIdentity, requirementFor, sparkleTargets, sign };

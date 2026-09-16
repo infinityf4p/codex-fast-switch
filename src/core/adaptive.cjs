@@ -6,6 +6,7 @@ const walk = require('acorn-walk');
 const { sha256 } = require('./archive.cjs');
 const defaultRecipes = JSON.parse(fs.readFileSync(path.join(__dirname, 'recipes.json'), 'utf8'));
 const defaultIconRecipe = JSON.parse(fs.readFileSync(path.join(__dirname, 'icon-recipe.json'), 'utf8'));
+const defaultPickerRecipes = require('./picker-recipe.json');
 
 const parse = source => acorn.parse(source, { ecmaVersion: 'latest', sourceType: 'module' });
 const stableNames = new Set(['undefined', 'NaN', 'Infinity', 'Set', 'Map', 'Array', 'Object', 'Symbol', 'JSON', 'Math', 'Promise']);
@@ -47,12 +48,12 @@ function nodePath(root, target, keys = []) {
   }
   return null;
 }
-function replacement(source, fn, target, kind, modelSettingsPath) {
+function replacement(source, fn, target, kind, modelSettingsPath, modelPath = ['model']) {
   const original = source.slice(target.start, target.end);
   if (kind === 'models') {
     const settings = modelSettingsPath ? at(fn, modelSettingsPath) : fn.params[1];
     if (settings?.type !== 'Identifier' || target.type !== 'Identifier') throw new Error('Unsupported model query arguments.');
-    return `{...${original},additionalAvailableModels:new Set([${settings.name}.model])}`;
+    return `{...${original},additionalAvailableModels:new Set([${[settings.name, ...modelPath].join('.')}])}`;
   }
   if (target.type !== 'BinaryExpression') throw new Error('Unsupported authentication check.');
   const left = source.slice(target.left.start, target.left.end);
@@ -71,20 +72,24 @@ function adapt(source, recipes) {
       const body = source.slice(fn.start, fn.end);
       if (!body.includes('fast_mode') && !body.includes('serviceTierForRequest') && !body.includes('readServiceTier')) return;
       const normalized = shape(fn);
-      const recipe = recipes.find(item => item.fingerprint === normalized.fingerprint);
+      let recipe;
+      for (const item of recipes) {
+        const variant = [item, ...(item.compatibleFingerprints || [])]
+          .find(candidate => candidate.fingerprint === normalized.fingerprint);
+        if (variant) { recipe = { ...item, ...variant }; break; }
+      }
       if (recipe) matches.push({ fn, recipe, names: normalized.names });
     },
   });
   const edits = matches.map(match => {
     const target = at(match.fn, match.recipe.path);
     return { ...match, start: target.start, end: target.end,
-      value: replacement(source, match.fn, target, match.recipe.kind, match.recipe.modelSettingsPath) };
+      value: replacement(source, match.fn, target, match.recipe.kind, match.recipe.modelSettingsPath, match.recipe.modelPath) };
   });
   let patched = source;
   for (const edit of edits.toSorted((a, b) => b.start - a.start)) {
     patched = patched.slice(0, edit.start) + edit.value + patched.slice(edit.end);
   }
-  parse(patched);
   for (const match of matches) {
     const original = source.slice(match.fn.start, match.fn.end);
     const edit = edits.find(item => item.fn === match.fn);
@@ -169,17 +174,21 @@ function adaptFastIcon(source, recipe = defaultIconRecipe) {
 }
 
 async function planArchive(archive, recipes = defaultRecipes, iconRecipe = recipes === defaultRecipes ? defaultIconRecipe : null,
-  compactRecipe = recipes === defaultRecipes ? undefined : null) {
+  compactRecipe = recipes === defaultRecipes ? undefined : null,
+  pickerRecipes = recipes === defaultRecipes ? defaultPickerRecipes : null) {
   const asar = require('@electron/asar');
   const { adaptCompact } = require('./compact.cjs');
+  const { adaptPicker } = require('./picker.cjs');
   asar.uncacheAll();
   const files = asar.listPackage(archive).map(file => file.replaceAll('\\', '/').replace(/^\//, ''))
     .filter(file => (file.startsWith('webview/') || file.startsWith('.vite/build/')) && file.endsWith('.js'))
     .map(file => path.normalize(file));
   const targets = [];
   const allMatches = [];
+  const detectedRequirements = new Set();
   let iconMatches = 0;
   let compactMatches = 0;
+  const pickerMatches = [];
   for (const entry of files) {
     const scope = entry.replaceAll('\\', '/').startsWith('.vite/') ? 'main' : 'webview';
     const scopedRecipes = recipes.filter(recipe => (recipe.scopes || ['webview']).includes(scope));
@@ -188,21 +197,30 @@ async function planArchive(archive, recipes = defaultRecipes, iconRecipe = recip
     if (info.unpacked || info.link || info.size > 32 * 1024 * 1024) continue;
     const bytes = asar.extractFile(archive, entry);
     const source = bytes.toString('utf8');
+    // Older apps may lack an optional feature entirely; unknown implementations must still fail closed.
+    for (const recipe of scopedRecipes) {
+      if (recipe.requiredMarker && source.includes(recipe.requiredMarker)) detectedRequirements.add(recipe.kind);
+    }
     if (!source.includes('fast_mode') && !source.includes('serviceTierForRequest') && !source.includes('readServiceTier') &&
-      !((iconRecipe || compactRecipe !== null) && source.includes('serviceTierIconKind'))) continue;
+      !((iconRecipe || compactRecipe !== null) && source.includes('serviceTierIconKind')) &&
+      !(pickerRecipes && source.includes('stripGptPrefix'))) continue;
     const result = adapt(source, scopedRecipes);
     const icon = scope === 'webview' && iconRecipe && source.includes('serviceTierIconKind') ? adaptFastIcon(result.patched, iconRecipe) : null;
     const compact = scope === 'webview' && compactRecipe !== null && source.includes('serviceTierIconKind')
       ? adaptCompact(icon?.patched ?? result.patched, compactRecipe) : null;
+    const picker = scope === 'webview' && pickerRecipes && source.includes('stripGptPrefix')
+      ? adaptPicker(compact?.patched ?? icon?.patched ?? result.patched, pickerRecipes) : null;
     if (icon?.matched) iconMatches++;
     if (compact?.matched) compactMatches++;
-    if (!result.matches.length && !icon?.changed && !compact?.changed) continue;
+    pickerMatches.push(...(picker?.matches ?? []));
+    const pickerChanges = picker?.matches.filter(match => match.changed).map(match => match.kind) ?? [];
+    if (!result.matches.length && !icon?.changed && !compact?.changed && !pickerChanges.length) continue;
     allMatches.push(...result.matches.map(match => ({ ...match, scope })));
-    targets.push({ entry, sourceSha256: sha256(bytes), patched: Buffer.from(compact?.patched ?? icon?.patched ?? result.patched),
+    targets.push({ entry, sourceSha256: sha256(bytes), patched: Buffer.from(picker?.patched ?? compact?.patched ?? icon?.patched ?? result.patched),
       kinds: [...result.matches.map(item => item.recipe.kind), ...(icon?.changed ? ['fast-icon'] : []),
-        ...(compact?.changed ? ['compact-model-control'] : [])] });
+        ...(compact?.changed ? ['compact-model-control'] : []), ...pickerChanges] });
   }
-  const required = new Set([...recipes.filter(recipe => !recipe.optional).map(recipe => recipe.kind),
+  const required = new Set([...recipes.filter(recipe => !recipe.optional).map(recipe => recipe.kind), ...detectedRequirements,
     ...allMatches.flatMap(match => match.recipe.requires || [])]);
   for (const kind of new Set([...required, ...allMatches.map(match => match.recipe.kind)])) {
     const scopes = new Set(recipes.filter(recipe => recipe.kind === kind).flatMap(recipe => recipe.scopes || ['webview']));
@@ -213,6 +231,12 @@ async function planArchive(archive, recipes = defaultRecipes, iconRecipe = recip
   }
   if (iconRecipe && iconMatches !== 1) throw new Error('Cannot uniquely recognize the Fast icon. The official app will be kept unchanged.');
   if (compactRecipe !== null && compactMatches !== 1) throw new Error('Cannot uniquely recognize the compact model control. The official app will be kept unchanged.');
+  for (const recipe of pickerRecipes ?? []) {
+    if (pickerMatches.filter(match => match.kind === recipe.kind).length !== 1) {
+      throw new Error(`Cannot uniquely recognize ${recipe.kind} logic. The official app will be kept unchanged.`);
+    }
+  }
+  if (recipes === defaultRecipes) targets.push(...require('./startup.cjs').planStartup(archive, files));
   return { targets, checks: await validateGates(allMatches) };
 }
 module.exports = { parse, shape, at, nodePath, replacement, adapt, adaptFastIcon, validateGates, planArchive };

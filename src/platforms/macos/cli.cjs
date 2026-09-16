@@ -3,6 +3,7 @@ const path = require('node:path');
 const { parseArgs } = require('node:util');
 const tx = require('./transaction.cjs');
 const automatic = require('./automatic.cjs');
+const storage = require('./storage.cjs');
 const { discoverApp, requireMac } = require('./platform.cjs');
 const { planArchive } = require('../../core/adaptive.cjs');
 
@@ -24,11 +25,11 @@ async function main(args = process.argv.slice(2)) {
     app: { type: 'string' }, state: { type: 'string' }, model: { type: 'string' }, help: { type: 'boolean', short: 'h' },
   } });
   if (values.help) {
-    console.log('Codex Fast Switch\n\nnode cli.cjs <setup|doctor|restart|install|enable|disable|restore|status> [--app PATH] [--state PATH]\n\nsetup: install or update automatic patching, then apply and reopen the app\nrestart: request normal quit, apply the patch, and reopen the same app\ninstall: apply once, with the app closed\nenable: apply automatically on exit, without a stability delay\ndisable: stop automatic patching; keep the current patch\nrestore: disable automation and restore this installation\ndoctor: inspect signature and supported code structure without patching\nstatus: show configuration and the last recorded operation');
+    console.log('Codex Fast Switch\n\nnode cli.cjs <setup|doctor|restart|install|enable|disable|restore|status|keychain-enable> [--app PATH] [--state PATH]\n\nsetup: install or update automatic patching, then apply and reopen the app\nrestart: request normal quit, apply the patch, and reopen the same app\ninstall: apply once, with the app closed\nenable: apply automatically on exit, without a stability delay\ndisable: stop automatic patching; keep the current patch\nrestore: disable automation and restore this installation\ndoctor: inspect signature and supported code structure without patching\nstatus: show configuration and the last recorded operation\nkeychain-enable: install a persistent Storage Key helper, apply and reopen the app');
     return;
   }
   const [command = 'status'] = positionals;
-  if (positionals.length > 1 || !['setup', 'doctor', 'restart', 'install', 'enable', 'disable', 'restore', 'status'].includes(command)) throw new Error('Unknown command. Run node cli.cjs --help.');
+  if (positionals.length > 1 || !['setup', 'doctor', 'restart', 'install', 'enable', 'disable', 'restore', 'status', 'keychain-enable'].includes(command)) throw new Error('Unknown command. Run node cli.cjs --help.');
   const state = path.resolve(values.state || tx.DEFAULT_STATE);
   if (command === 'status') return automatic.status(state);
   requireMac();
@@ -37,12 +38,17 @@ async function main(args = process.argv.slice(2)) {
   if (command === 'enable') return automatic.enable(state, app, { model: values.model });
   if (command === 'restore') return automatic.restore(state, app);
   const progress = phase => console.error(`Patch: ${phase}`);
-  if (command === 'setup') {
+  if (command === 'keychain-enable') {
+    tx.verify(app, !tx.marker(app));
+    await waitForOperation(() => tx.withLock(state, () => storage.enable(state, app)));
+    console.error('The first Storage Key access may ask you to authorize Codex Storage Access. Choose Always Allow to retain authorization.');
+  }
+  if (command === 'setup' || command === 'keychain-enable') {
     console.error('Installing automatic Fast patching...');
     const enabled = await waitForOperation(() => automatic.enable(state, app, { model: values.model }));
     if (enabled.status !== 'enabled') throw new Error(`Automatic patching was not enabled: ${enabled.status}`);
   }
-  if (command === 'restart' || command === 'setup') {
+  if (command === 'restart' || command === 'setup' || command === 'keychain-enable') {
     return waitForOperation(() => automatic.restart(state, app, { model: values.model, onPhase: progress }));
   }
   if (command === 'doctor') {

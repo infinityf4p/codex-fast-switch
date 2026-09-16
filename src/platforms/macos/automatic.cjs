@@ -6,8 +6,9 @@ const { execFileSync } = require('node:child_process');
 const transaction = require('./transaction.cjs');
 const { restart: performRestart } = require('./restart.cjs');
 const signing = require('./signing.cjs');
+const storage = require('./storage.cjs');
 const { copyRuntime } = require('../../core/runtime.cjs');
-const { assertStopped, identityFiles, discoverApp, requireMac, assertRuntime } = require('./platform.cjs');
+const { assertStopped, identityFiles, discoverApp, requireMac, assertRuntime, sparkleBusy } = require('./platform.cjs');
 const { DEFAULT_STATE, saveJson, readJson, withLock, marker, PATCH_ID } = transaction;
 const LABEL = 'io.github.infinityf4p.codex-fast-switch';
 const service = () => `gui/${process.getuid()}/${LABEL}`;
@@ -44,23 +45,26 @@ function stamp(app) {
 function notify(message) {
   execFileSync(path.join(__dirname, '../../../build/macos/native-helper'), ['notify', message], { stdio: 'ignore', timeout: 35000 });
 }
-async function tick(state = DEFAULT_STATE, { now = Date.now(), install = transaction.install, recover = transaction.recover,
-  stopped = assertStopped, notifyUser = notify, getStamp = stamp } = {}) {
+async function tick(state = DEFAULT_STATE, { now = Date.now, install = transaction.install, recover = transaction.recover,
+  stopped = assertStopped, notifyUser = notify, getStamp = stamp, updaterBusy = sparkleBusy,
+  restartApp = performRestart } = {}) {
   state = path.resolve(state);
   return withLock(state, async () => {
     const config = readOptional(configPath(state));
     if (!config.enabled) return { status: 'disabled' };
     const app = config.app;
     const previous = readOptional(statusPath(state));
+    let latest = previous;
     const finish = (status, extra = {}) => {
-      const value = { ...previous, status, checkedAt: new Date(now).toISOString(), ...extra };
+      const value = { ...latest, status, checkedAt: new Date(typeof now === 'function' ? now() : now).toISOString(), ...extra };
       saveJson(statusPath(state), value);
+      latest = value;
       return value;
     };
     if (!fs.existsSync(app)) return finish('waiting-for-app');
     let currentStamp;
     try { currentStamp = JSON.stringify(getStamp(app)); } catch { return finish('waiting-for-update'); }
-    if (previous.successStamp === currentStamp) return { status: 'idle' };
+    if (previous.successStamp === currentStamp && !previous.needsApply) return { status: 'idle' };
     let record;
     try { record = transaction.checkedRecord(state, app); }
     catch (error) {
@@ -72,9 +76,24 @@ async function tick(state = DEFAULT_STATE, { now = Date.now(), install = transac
     }
     const pendingRecovery = ['prepared', 'activated', 'rollback-pending'].includes(record?.phase);
     if (!pendingRecovery && previous.rejectedStamp === currentStamp) return { status: 'rejected-until-next-update' };
+    if (updaterBusy(app)) return finish('waiting-for-update');
+    let adoptUpdate = false;
     try { stopped(app); } catch (error) {
-      if (error.code === 'APP_RUNNING') return finish('waiting-for-exit');
-      return finish('process-check-failed', { error: error.message });
+      if (error.code === 'APP_RUNNING') {
+        if (!pendingRecovery && previous.attemptedStamp !== currentStamp && !marker(app)) {
+          adoptUpdate = Boolean(previous.successStamp);
+          // Older worker upgrades discarded the status file; the durable installation record still identifies the previous build.
+          if (!adoptUpdate && record?.phase === 'installed' && record.version && record.build) {
+            try {
+              const current = transaction.version(app);
+              adoptUpdate = current.version !== record.version || current.build !== record.build;
+            } catch { return finish('waiting-for-update', { error: null }); }
+          }
+        }
+        if (!adoptUpdate) return finish('waiting-for-exit', { adoptUpdate: false });
+      } else {
+        return finish('process-check-failed', { error: error.message });
+      }
     }
     try {
       if (pendingRecovery) {
@@ -84,11 +103,29 @@ async function tick(state = DEFAULT_STATE, { now = Date.now(), install = transac
         try { notifyUser('An interrupted Fast patch was rolled back. The unmodified app for that version is available. Automatic retries are paused until the next update.'); } catch {}
         return { status: 'recovered', result };
       }
-      const result = await install(app, state, { model: config.model });
+      let result;
+      if (adoptUpdate) {
+        result = await restartApp(app, state, {
+          install: (app, state, options) => install(app, state, { ...options, model: config.model }),
+          beforeQuit: () => {
+            let changed = true;
+            try { changed = JSON.stringify(getStamp(app)) !== currentStamp; } catch {}
+            if (changed || updaterBusy(app)) {
+              throw Object.assign(new Error('The official updater is still replacing the app.'), { code: 'UPDATE_IN_PROGRESS' });
+            }
+            finish('restarting', { attemptedStamp: currentStamp, adoptUpdate: false });
+          },
+          onPhase: phase => finish('restarting', { phase, error: null }),
+        });
+      } else {
+        result = await install(app, state, { model: config.model });
+      }
       if (!['installed', 'already-installed'].includes(result.status)) throw new Error(`Patch was not activated: ${result.status}`);
-      return finish('installed', { result, successStamp: JSON.stringify(getStamp(app)), rejectedStamp: null, error: null });
+      return finish('installed', { result, successStamp: JSON.stringify(getStamp(app)), rejectedStamp: null,
+        attemptedStamp: null, adoptUpdate: false, needsApply: false, phase: null, error: null });
     } catch (error) {
-      if (error.code === 'APP_RUNNING') return finish('waiting-for-exit');
+      if (error.code === 'UPDATE_IN_PROGRESS') return finish('waiting-for-update');
+      if (['APP_RUNNING', 'QUIT_TIMEOUT'].includes(error.code)) return finish('waiting-for-exit', { error: error.message });
       let failedStamp = currentStamp;
       try { failedStamp = JSON.stringify(getStamp(app)); } catch {}
       let pending = false;
@@ -121,7 +158,8 @@ function stopService(state) {
 function plistDefinition(node, worker, state) {
   return { Label: LABEL, ProgramArguments: [node, worker, 'watch', state], RunAtLoad: true,
     KeepAlive: { SuccessfulExit: false }, ThrottleInterval: 10,
-    ProcessType: 'Background', LowPriorityIO: true, LimitLoadToSessionType: 'Aqua',
+    // Preparation gates Fast availability after updates; idle work is timer-driven.
+    ProcessType: 'Interactive', LimitLoadToSessionType: 'Aqua',
     StandardOutPath: path.join(state, 'automatic.log'), StandardErrorPath: path.join(state, 'automatic-error.log'),
     EnvironmentVariables: { PATH: '/usr/bin:/bin:/usr/sbin:/sbin' } };
 }
@@ -165,7 +203,10 @@ function installAgent(state, app, model) {
     execFileSync('/usr/bin/plutil', ['-convert', 'xml1', plist]);
     execFileSync('/usr/bin/plutil', ['-lint', plist]);
     saveJson(configPath(state), { enabled: true, app, model, enabledAt: new Date().toISOString() });
-    if (fs.existsSync(statusPath(state))) fs.rmSync(statusPath(state));
+    const previousStatus = readOptional(statusPath(state));
+    saveJson(statusPath(state), { status: 'enabled', checkedAt: new Date().toISOString(),
+      needsApply: marker(app)?.revision !== transaction.PATCH_REVISION || !storage.matchesMarker(state, app, marker(app)),
+      ...(previousStatus.successStamp ? { successStamp: previousStatus.successStamp } : {}) });
     execFileSync('/bin/launchctl', ['bootstrap', `gui/${process.getuid()}`, plist]);
     return { status: 'enabled', app, appliesOnExit: true,
       nextStep: 'Run launchers/macos/Apply and Restart.command to apply now and reopen the app automatically.' };
@@ -193,27 +234,33 @@ async function disable(state = DEFAULT_STATE) {
 }
 function status(state = DEFAULT_STATE) {
   return { configuration: readOptional(configPath(state)), lastCheck: readOptional(statusPath(state)),
+    updateHook: readOptional(path.join(state, 'update-hook-status.json')),
+    storageHelper: storage.configuration(state), storageAccess: readOptional(path.join(state, 'storage-status.json')),
     transaction: readOptional(transaction.recordPath(state)) };
 }
-async function restart(state = DEFAULT_STATE, app = discoverApp(), options = {}) {
-  stopStrayRestartJobs();
+async function restart(state = DEFAULT_STATE, app = discoverApp(), { getStamp = stamp, ensureIdentity = signing.ensureIdentity,
+  stopJobs = stopStrayRestartJobs, ...options } = {}) {
+  stopJobs();
   return withLock(state, async () => {
-    signing.ensureIdentity(state, { expectedCertificateSha256: marker(app)?.signingCertificateSha256 ||
+    ensureIdentity(state, { expectedCertificateSha256: marker(app)?.signingCertificateSha256 ||
       transaction.checkedRecord(state, app)?.signingCertificateSha256 });
+    const previous = readOptional(statusPath(state));
+    let attemptedStamp = previous.attemptedStamp;
     const onPhase = phase => {
-      saveJson(statusPath(state), { status: 'restarting', phase, checkedAt: new Date().toISOString() });
+      saveJson(statusPath(state), { ...previous, attemptedStamp, status: 'restarting', phase, checkedAt: new Date().toISOString() });
       options.onPhase?.(phase);
     };
     try {
+      attemptedStamp = JSON.stringify(getStamp(app));
       const result = await performRestart(app, state, { ...options, onPhase });
       saveJson(statusPath(state), { status: 'installed', checkedAt: new Date().toISOString(),
-        successStamp: JSON.stringify(stamp(app)), result });
+        successStamp: JSON.stringify(getStamp(app)), result });
       return result;
     } catch (error) {
       let rejectedStamp;
       const waitingForExit = ['QUIT_TIMEOUT', 'APP_RUNNING'].includes(error.code);
-      if (!waitingForExit) try { rejectedStamp = JSON.stringify(stamp(app)); } catch {}
-      saveJson(statusPath(state), { status: waitingForExit ? 'waiting-for-exit' : 'failed', checkedAt: new Date().toISOString(),
+      if (!waitingForExit) try { rejectedStamp = JSON.stringify(getStamp(app)); } catch {}
+      saveJson(statusPath(state), { ...previous, attemptedStamp, status: waitingForExit ? 'waiting-for-exit' : 'failed', checkedAt: new Date().toISOString(),
         error: error.message, rejectedStamp, reopenedAfterFailure: error.reopenedAfterFailure });
       throw error;
     }

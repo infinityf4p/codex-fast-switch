@@ -48,6 +48,19 @@ function isRunning(app) {
   try { assertStopped(app); return false; }
   catch (error) { if (error.code === 'APP_RUNNING') return true; throw error; }
 }
+function isSparkleUpdater(app, command) {
+  const match = command.trim().match(/^(.*\/(?:Autoupdate|Updater\.app\/Contents\/MacOS\/Updater))(?:\s+(.*))?$/);
+  if (!match) return false;
+  const [, executable, args = ''] = match;
+  if (executable.startsWith(path.posix.join(app, 'Contents/Frameworks/Sparkle.framework') + '/')) return true;
+  // Sparkle copies Updater.app into its cache and passes the host app as its first argument.
+  return executable.endsWith('/Updater.app/Contents/MacOS/Updater') && (args === app || args.startsWith(app + ' '));
+}
+function sparkleBusy(app) {
+  if (process.platform !== 'darwin') return false;
+  const output = execFileSync('/bin/ps', ['-wwaxo', 'command='], { encoding: 'utf8' });
+  return output.split('\n').some(line => isSparkleUpdater(app, line));
+}
 function requestQuit(app) {
   execFileSync(path.join(__dirname, '../../../build/macos/native-helper'), ['quit', app], { stdio: 'pipe', timeout: 10000 });
 }
@@ -60,4 +73,5 @@ function assertRuntime(node) {
   if (!(major > 22 || (major === 22 && minor >= 12))) throw new Error('Node.js 22.12 or newer is required.');
   return node;
 }
-module.exports = { requireMac, metadata, discoverApp, binaryPath, identityFiles, assertStopped, assertRuntime, isRunning, requestQuit, openApp };
+module.exports = { requireMac, metadata, discoverApp, binaryPath, identityFiles, assertStopped, assertRuntime,
+  isRunning, isSparkleUpdater, sparkleBusy, requestQuit, openApp };

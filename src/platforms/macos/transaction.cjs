@@ -8,11 +8,13 @@ const { sha256, patchArchive } = require('../../core/archive.cjs');
 const { assertStopped, identityFiles, discoverApp } = require('./platform.cjs');
 const { planArchive } = require('../../core/adaptive.cjs');
 const signing = require('./signing.cjs');
+const updateHook = require('./update-hook.cjs');
+const storage = require('./storage.cjs');
 const { saveJson, readJson, withLock } = require('../../core/state.cjs');
 
 const DEFAULT_STATE = path.join(os.homedir(), 'Library/Application Support/Codex Fast Switch');
 const PATCH_ID = 'codex-fast-switch-v1';
-const PATCH_REVISION = 4;
+const PATCH_REVISION = 10;
 const MARKER = 'Contents/Resources/codex-fast-switch.json';
 const archivePath = app => path.join(app, 'Contents/Resources/app.asar');
 const equal = (a, b) => JSON.stringify(a) === JSON.stringify(b);
@@ -61,23 +63,27 @@ function checkedRecord(state, app) {
 
 async function stage(app, destination, plan, metadata, state) {
   const identity = signing.ensureIdentity(state);
+  const update = updateHook.plan(archivePath(app));
+  const targets = [...plan.targets, update];
   execFileSync('/bin/cp', ['-cR', app, destination]);
   let hashes;
-  for (const target of plan.targets) {
+  for (const target of targets) {
     hashes = patchArchive(archivePath(destination), target.entry, bytes => {
       if (sha256(bytes) !== target.sourceSha256) throw new Error('Source changed during staging.');
       return target.patched;
     });
   }
+  updateHook.copyResources(destination, app, state);
+  const storageHelper = storage.copyBridge(destination, app, state);
   execFileSync('/usr/libexec/PlistBuddy', ['-c',
     `Set :ElectronAsarIntegrity:Resources/app.asar:hash ${hashes.headerSha256}`, path.join(destination, 'Contents/Info.plist')]);
   saveJson(path.join(destination, MARKER), { patchId: PATCH_ID, revision: PATCH_REVISION, ...metadata,
+    ...(storageHelper ? { storageHelper } : {}),
     signingCertificateSha256: identity.certificateSha256,
-    archiveSha256: hashes.patchedArchiveSha256, entries: plan.targets.map(target => ({ entry: target.entry, sha256: sha256(target.patched) })) });
+    archiveSha256: hashes.patchedArchiveSha256, entries: targets.map(target => ({ entry: target.entry, sha256: sha256(target.patched) })) });
   execFileSync('/usr/bin/xattr', ['-dr', 'com.apple.FinderInfo', destination]);
   signing.sign(destination, state, { entitlements: path.join(__dirname, 'local-entitlements.plist'),
     expectedCertificateSha256: identity.certificateSha256 });
-  verify(destination);
   return identity.certificateSha256;
 }
 
@@ -120,23 +126,27 @@ function recover(app, state) {
   return rollback(state, record);
 }
 
-async function install(app = discoverApp(), state = DEFAULT_STATE, { check, onPhase = () => {}, model } = {}) {
+async function install(app = discoverApp(), state = DEFAULT_STATE, { check, onPhase = () => {}, model, beforeActivate } = {}) {
   app = fs.realpathSync(app);
   state = path.resolve(state);
-  assertStopped(app);
+  // Official updates can be prepared while running; restoring an older patch still requires an exit first.
+  if (!beforeActivate || marker(app) || ['prepared', 'activated', 'rollback-pending'].includes(checkedRecord(state, app)?.phase)) {
+    await beforeActivate?.();
+    assertStopped(app);
+  }
   const recovery = recover(app, state);
   if (recovery) return recovery;
   const current = marker(app);
   if (current) {
     const record = checkedRecord(state, app);
     if (current.patchId === PATCH_ID && record?.phase === 'installed' && same(app, record.patched)) {
-      if (current.revision !== PATCH_REVISION) {
+      if (current.revision !== PATCH_REVISION || !storage.matchesMarker(state, app, current)) {
         const revision = current.revision ?? 1;
         if (!Number.isSafeInteger(revision) || revision < 1 || revision > PATCH_REVISION) {
           throw new Error('This installed patch requires a newer version of Codex Fast Switch.');
         }
         rollback(state, record, 'restored');
-        return install(app, state, { check, onPhase, model });
+        return install(app, state, { check, onPhase, model, beforeActivate });
       }
       verify(app);
       return { status: 'already-installed', ...version(app) };
@@ -168,6 +178,10 @@ async function install(app = discoverApp(), state = DEFAULT_STATE, { check, onPh
       record.health = await check(destination, { model, onProgress: event => onPhase('health-progress', event) });
       if (!record.health?.passed) throw new Error('Patched app did not pass the health check.');
     }
+    if (!same(app, original)) {
+      throw Object.assign(new Error('Official app changed during preparation. No update was overwritten.'), { code: 'UPDATE_IN_PROGRESS' });
+    }
+    await beforeActivate?.();
     assertStopped(app);
     if (!same(app, original)) throw new Error('Official app changed during patching. No update was overwritten.');
     record.phase = 'prepared';

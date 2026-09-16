@@ -85,12 +85,12 @@
     "patchedFingerprint": "3ceb0575ba184f439df88c408909b9ea82789abe9df42431b0801fdb6ba8d511",
     "path": ["body", "body", 4, "declarations", 0, "init", "arguments", 0],
     "modelSettingsPath": ["body", "body", 0, "declarations", 1, "id", "properties", 0, "value"],
-    "requires": ["saved-request"],
     "environment": []
   },
   {
     "kind": "saved-request",
     "optional": true,
+    "requiredMarker": "readServiceTier",
     "scopes": ["webview", "main"],
     "fingerprint": "d6fed6d2f1a28969ab33cef77e46c6c91e0e3f0c0fbae4e7bbdbec406ebe0d84",
     "patchedFingerprint": "017af7a432d43749ceed3bcb5b441f1960fa19f359d097406a705b87d890e6da",

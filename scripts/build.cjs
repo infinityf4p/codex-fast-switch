@@ -17,6 +17,17 @@ execFileSync('/usr/bin/xcrun', ['clang', '-O2', '-fobjc-arc', '-arch', 'arm64', 
   '-mmacosx-version-min=13.0', '-Wno-deprecated-declarations', '-framework', 'Foundation', '-framework', 'Security',
   path.join(root, 'src/platforms/macos/signing-native.m'), '-o', path.join(build, 'signing-helper')], { stdio: 'inherit' });
 fs.chmodSync(path.join(build, 'signing-helper'), 0o755);
+execFileSync('/usr/bin/xcrun', ['clang', '-O2', '-fobjc-arc', '-arch', 'arm64', '-arch', 'x86_64',
+  '-mmacosx-version-min=13.0', '-dynamiclib', '-framework', 'Foundation',
+  path.join(root, 'src/platforms/macos/update-hook.m'), '-o', path.join(build, 'codex-fast-update-hook.dylib')], { stdio: 'inherit' });
+execFileSync('/usr/bin/xcrun', ['clang', '-O2', '-fobjc-arc', '-arch', 'arm64', '-arch', 'x86_64',
+  '-mmacosx-version-min=13.0', '-Wno-deprecated-declarations', '-framework', 'Foundation', '-framework', 'Security',
+  path.join(root, 'src/platforms/macos/storage-access.m'), '-o', path.join(build, 'storage-access')], { stdio: 'inherit' });
+execFileSync('/usr/bin/xcrun', ['clang', '-O2', '-fobjc-arc', '-arch', 'arm64', '-arch', 'x86_64',
+  '-mmacosx-version-min=13.0', '-Wno-deprecated-declarations', '-dynamiclib', '-framework', 'Foundation', '-framework', 'Security',
+  '-Wl,-reexport-lSystem', '-Wl,-compatibility_version,1.0.0', '-Wl,-current_version,1356.0.0',
+  '-Wl,-install_name,@executable_path/../Resources/cfs-storage.dylib',
+  path.join(root, 'src/platforms/macos/storage-bridge.m'), '-o', path.join(build, 'cfs-storage.dylib')], { stdio: 'inherit' });
 const launchers = path.join(root, 'launchers/macos');
 for (const file of fs.readdirSync(launchers).filter(file => file.endsWith('.command') || file.endsWith('.zsh'))) {
   fs.chmodSync(path.join(launchers, file), 0o755);

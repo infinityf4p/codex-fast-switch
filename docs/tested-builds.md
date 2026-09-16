@@ -12,6 +12,10 @@ On Windows x64 with app **26.908.40834 (8881)**, the shortcut's extracted icon c
 
 The repaired shortcuts and a Shell icon-cache notification visibly restored the running taskbar icon. The active generation, monitor configuration, official and patched app fingerprints, and app process IDs were unchanged. The app was not restarted. Source/PowerShell checks, both existing Windows shortcut tests, and Windows installer packaging passed.
 
+## 2026-09-16: recorded production installation on build 9275
+
+Read-only inspection found revision **10** installed on **26.908.70816 (9275)** at **17:21:44 Asia/Shanghai**. The installed fingerprint matches its transaction record and deep signature verification passes. The new app process read the Storage Key successfully at **17:21:46** and reported an active Sparkle hook at **17:21:53**. The fixed helper's files still match its recorded hashes. These observations verify installation and helper access; this inspection did not repeat the UI, provider-request or full update-cycle tests.
+
 ## 2026-09-15: Windows 8881 compatibility and cross-version update
 
 Verification used Windows x64, installed Store package **26.908.4834.0**, app **26.908.40834 (8881)** and Windows patch revision **4**. The previous personal Fast copy was **26.901.51231 (8109)**, revision **3**.
@@ -26,6 +30,44 @@ Verification used Windows x64, installed Store package **26.908.4834.0**, app **
 The repaired revision-4 worker was then deployed to the personal installation without quitting its app. Installed worker hashes matched the source, compatibility recognition passed, and the update check reported 8881 available with no recorded failure. One new monitor replaced the old one. The personal app retained its PID and creation time, active revision-3 generation and file hashes; the official package was also unchanged. The personal app itself remained on 8109, ready for the user's next native Update click.
 
 The test used an already-installed official package; it did not download an update from Microsoft Store. App background initialization was allowed, while all model requests used a dummy key and a loopback mock. It does not measure provider performance, test every model or tool-using follow-up turn, or establish new macOS/ARM64 compatibility. Readiness during an in-progress authentication refresh remains the app's native behavior.
+
+## 2026-09-12: build 8881 compatibility repair and production activation
+
+The production app updated from **26.903.71938 (8576)** to **26.908.40834 (8881)** through the official updater. Revision 9's handoff ran, but compact-picker recognition rejected the changed legacy layout before modifying the app. The official app reopened with its Apple signature intact. Process sampling observed **11.319 seconds** from the old process disappearing to the new process appearing; the handoff reported **21.455 seconds**, including its failure notification. These are not window-readiness measurements.
+
+Revision **10** adds the reviewed legacy-layout fingerprint and target paths for 8881. Its modern layout still matches an existing recipe. All patch targets were recognized and the 12 permission-gate cases passed. The 14 compact, picker and startup unit checks passed, as did 18 combinations of the actual 8881 compact rendering statements evaluated with stubbed JSX and component dependencies. These cover Fast/Standard/UltraFast, reasoning labels, hidden labels, GPT-prefix props and the new button accessibility properties; repeated adaptation is unchanged. The 8881 primary bundle no longer imports the authed-route chunk that caused the earlier startup cycle, so no route-initialization edit is applied to this build.
+
+A signed revision 10 candidate passed deep signature verification, and the production worker was updated with a retained previous-worker backup. The official app and fixed Storage helper remained unchanged during preparation. The user-run installation entry activated the candidate at **17:00:22 Asia/Shanghai**, reporting **1.170 seconds** for activation. The observer recorded the reopened app, a successful Storage Key read at **17:00:24**, and an active Sparkle hook at **17:00:32**, with no recorded renderer startup error. UI confirmation and absence of Keychain prompts were not supplied. This was a manual compatibility repair after the failed official update, not a successful 8881 automatic-update cycle.
+
+## 2026-09-11: builds 8690 and 8720, official update and startup repair
+
+The official **26.908.31457 (8690)** and **26.908.31748 (8720)** full archives passed the appcast's Ed25519 signature check and Apple's app signing requirement. Reviewed per-layout paths recognize their changed compact picker while preserving older recipes.
+
+The complete official-update cycle was repeated with **revision 9** and passed. The isolated **8576** app started at **14:07:12 Asia/Shanghai**; after the user triggered the official update, the worker automatically patched **8720** and launched it at **14:09:00**, without a manual patch command. The restart handoff reported **23.302 seconds**, which measures the handoff through relaunch, not download time or window readiness. Both app processes read the dummy Storage Key through the unchanged helper. The user confirmed that the interface and Fast controls worked and that no Keychain prompt appeared. Final signature and backup checks passed, no renderer startup errors were present through **14:10:53**, and the production app's fingerprint remained unchanged.
+
+A user-triggered official update from **26.903.71938 (8576)** to **8720** installed revision 8 and reopened the same isolated app automatically. The restart handoff reported **20.187 seconds**. Both app processes read the dummy Storage Key through the same unchanged helper, and the production app's fingerprint remained unchanged. The test uses the public official appcast: the separate production backend appcast offered only 8576 for the test installation at the time of the check.
+
+This was **not a passing end-to-end run**: the reopened renderer failed with `TypeError: r is not a function`. The initial observer had finished on the Storage Key read before the error appeared. It now waits for the new process's update hook, records renderer failures separately, and leaves overall success pending UI confirmation. A diagnostic startup traced the failure to `authed-route-86740a2af5a2.js:1:1573`; that file was identical to the official archive. Its circular import calls an initializer from `app-primary` before that initializer is assigned.
+
+Revision 9 defers that initializer until a route component is invoked, matching only the exact reviewed 8690 and 8720 route chunks. A native Node ES-module reproduction fails with the original ordering and passes both import orders after the fix. The related 34 startup, picker, archive and core checks passed. Before the complete revision 9 cycle above, a repaired 8720 candidate passed signature verification and retained the same helper. That repaired app opened at **13:57:21 Asia/Shanghai**, read the dummy Storage Key successfully, loaded its update hook, and produced no route-prefetch or error-boundary failure in the observed startup. The user confirmed that the interface was normal. The production app and its installed worker were not updated by these tests.
+
+Isolated **26.901.51231 (8109)** and **26.903.71938 (8576)** apps were patched, then replaced on disk with the verified official 8690 app. The actual automatic worker tick installed revision 8 in **18.936 seconds** and **19.949 seconds**, respectively, including its normal recognition, staging and signing work. The temporary Storage helper executable remained identical, and the installed production app's fingerprint was unchanged. The tests used dedicated signing identities, dummy keychains and provider configurations.
+
+The offline replacements verify package recognition and installation, separately from the real update above. User-triggered updates use a test-only isolated reopen function; on patch failure this test refuses to open an unpatched copy, so its failure-opening behavior intentionally differs from production. No personal credentials, provider requests or real Keychain item contents were used.
+
+The first user-triggered update installed the official 8690 app, but Sparkle renamed the test's `Test Codex.app` to `ChatGPT.app`. The handoff still addressed the removed old path and failed before reopening. The test now keeps the official filename, and the handoff waits for the updater and bundle metadata before inspecting whether the app is running. Eight focused handoff tests pass, including a temporarily absent bundle.
+
+The second user-triggered update, from 8576, also installed the official 8690 app. Repatching failed because the test worker inherited an isolated `HOME`, causing `codesign` to report `no identity found`. Signing the same probe with the same identity succeeded under the normal user home and failed under the isolated home. The fixture now restores the normal home for its patch worker while retaining the app's isolated profile, Codex home and dummy keychain. Signing through the real worker entry point from an isolated environment passed after this fix. These earlier manual attempts remain failed runs. The later 8576-to-8720 run disabled Chromium's mock-keychain flag and unlocked its dummy keychain before launch to check actual helper reads.
+
+## 2026-09-11: official update observation and revision 6 installation
+
+An independent observer recorded the official update from **26.901.51231 (8109)** to **26.903.71938 (8576)**. At **09:03:52 Asia/Shanghai**, the old app exited and the official app replaced the patched bundle. A new app process was present within **0.4 seconds** of the exit notification. The monitor remained at `waiting-for-exit`; no automatic patch preparation occurred during that update. Process sampling was every 500 ms, so this is not an exact launch or window-ready measurement.
+
+The old app still contained revision 5: the earlier revision 6 installation had timed out waiting for normal quit. An older worker upgrade had also erased its successful-install baseline, disabling the fallback that adopts an already relaunched official update. The worker now preserves that baseline and can recover it from a checked installation record for a different build. Reviewed recipes cover build 8576's nested model settings and changed compact picker. Focused automatic, core, compact and relaunch tests passed; real-archive planning recognized all patch targets and passed the 12 gate cases.
+
+The repair's first attempt finished preparation in about **19 seconds**, then timed out waiting for normal quit. After the app subsequently exited, the updated monitor installed revision **6** at **09:24:16**, retaining a backup of the official 8576 app. The reopened app reported the Sparkle 2.9.1 restart handoff **active** at **09:24:42**. Installed worker files matched the checkout, and the patched app passed deep signature verification with the same pinned signing certificate.
+
+The user reported another `Codex Storage Key` authorization prompt on this patched launch. Keychain access rules were not changed. This verifies installation and loading of the handoff; the next official update using that handoff remains untested. No provider requests or relay changes were made.
 
 ## 2026-09-08: Windows shortcut routing
 
@@ -55,6 +97,23 @@ Local verification used Windows x64, Store package **26.901.6511.0**, app **26.9
 - Source and PowerShell syntax checks passed. Unit tests: **60 passed**, **10 platform-specific skips**, **0 failed**.
 
 The old official build was no longer installed, so the update trigger was a source-path change between signed copies of the **same official version**. The test did not download a Microsoft Store package, exercise a real version-number upgrade, verify the relaunched renderer through DevTools, or rerun Fast/Standard model request checks. The relaunch check verified the new executable, integrity and process arguments with the retained profile marker. Normal app background initialization and plugin/runtime downloads were allowed.
+## 2026-09-07: revision 6 preparation and update handoff
+
+Preparing an isolated copy of **26.901.51231 (8109)** through an interactive one-shot LaunchAgent took **18.4 seconds**, including original verification, recognition, cloning, all patches, signing and final verification. The source fingerprint was unchanged and the candidate was removed without activation or launch. Before removing duplicate parsing and signature verification, the same preparation workload took **20.8 seconds**. These single measurements include cache and system-load variation; neither is a second full official-update run. The earlier 141.6-second update below used a throttled background monitor.
+
+The actual bundled `objc-js` 1.5.0 bridge and Sparkle 2.9.1 classes loaded the native hook in an isolated process without initializing an updater or sending installation messages. A synthetic native connection verified that only a valid relaunch flag is changed after worker readiness, while other packets, disabled automation and a missing worker retain the original behavior. Targeted tests cover waiting for the old process and updater, reopening after rejection, cancelled quit, concurrent monitoring and refusing to launch pending recovery. Universal helpers were compiled; native execution was on arm64.
+
+The next real official update remains untested. No provider, personal API credentials or Keychain item contents were used.
+
+## 2026-09-07: official macOS update and automatic repatching, revision 5
+
+The installed app updated from **26.901.41600 (7982)** to **26.901.51231 (8109)** through the official updater. The existing monitor reapplied revision **5** automatically, without a manual patch command. The user confirmed that the Fast controls returned; the final archive, transaction fingerprints and deep signature verification passed.
+
+An independent observer recorded the update at **22:28:48 Asia/Shanghai**, automatic preparation starting at **22:28:54**, and patch installation completing at **22:31:29**. Preparation took **141.6 seconds** with the monitor's previous background CPU and I/O limits. The second exit-to-launch notification gap was **10.2 seconds**. The patcher's **2.1-second** closed interval ends when the open command returns and does not measure when the window is usable.
+
+The second, patched launch requested `Codex Storage Key` access despite using the same signing certificate. Read-only inspection found a `cdhash:` partition list on the existing item, which is an additional authorization check beyond the designated requirement. No key contents were read and no access rules were changed. Persistent local signing therefore does not guarantee prompt-free updates.
+
+Background throttling was subsequently removed and phase timestamps corrected. The complete update timings above describe the earlier monitor configuration, not the optimized configuration. Provider speed, billing and outgoing service tiers were not tested in this update run.
 
 ## 2026-09-05: reported existing-session Fast switching, Windows revision 2
 

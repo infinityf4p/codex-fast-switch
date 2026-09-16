@@ -21,6 +21,8 @@
     "test:windows:integration": "node test/integration/windows/integration.cjs",
     "test:transactions": "node test/integration/macos/transactions.cjs",
     "test:signing": "node test/integration/macos/signing.cjs",
+    "test:storage": "node test/integration/macos/storage.cjs",
+    "test:storage:app": "node test/integration/macos/storage-app.cjs",
     "test:restart": "node test/integration/macos/restart.cjs",
     "test:e2e": "node test/integration/macos/e2e.cjs",
     "test:launchagent": "node test/integration/macos/launchagent.cjs"

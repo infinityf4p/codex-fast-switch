@@ -1,0 +1,21 @@
+[
+  {
+    "kind": "model-name",
+    "fingerprint": "89125c241cf7d77584e080827d90c73c257219162246ae388f2b432dc97b7936",
+    "patchedFingerprint": "43c2c63e8ffc06b5e9fe0d8fa3da4a5b69b0eddada29f85b9c21fca943eb33f9",
+    "path": ["body", "body", 2, "argument"]
+  },
+  {
+    "kind": "default-model-presets",
+    "fingerprint": "eead139913525b2784285dd23306f1c1949d3e214f6c865482f042afecfb61ea",
+    "patchedFingerprint": "e1d4fb543d3db03415bbd659f17da303a3e28022ca1a3eca0df45c383fd970df",
+    "path": ["params", 1, "left", "properties", 2, "value"],
+    "presets": [[
+      { "model": "gpt-5.6-terra", "reasoning_effort": "low" },
+      { "model": "gpt-5.6-sol", "reasoning_effort": "low" },
+      { "model": "gpt-5.6-sol", "reasoning_effort": "medium" },
+      { "model": "gpt-6-astra", "reasoning_effort": "low" },
+      { "model": "gpt-6-astra", "reasoning_effort": "medium" }
+    ]]
+  }
+]

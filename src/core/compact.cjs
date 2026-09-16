@@ -54,27 +54,36 @@ function transformCompactFunction(source, fn, role, other, recipe) {
 function adaptCompact(source, recipes = defaultRecipes) {
   const { parse, shape } = require('./adaptive.cjs');
   const supported = Array.isArray(recipes) ? recipes : [recipes];
-  const matches = { legacy: [], modern: [] };
+  const groups = supported.map(recipe => ({ recipe, legacy: [], modern: [] }));
+  const roles = ['legacy', 'modern'];
   walk.simple(parse(source), { FunctionDeclaration(fn) {
     if (fn.end - fn.start > 32000 || !source.slice(fn.start, fn.end).includes('stripGptPrefix')) return;
     const fingerprint = shape(fn).fingerprint;
-    for (const recipe of supported) for (const role of Object.keys(matches)) {
-      if ([recipe[role].fingerprint, recipe[role].patchedFingerprint].includes(fingerprint)) {
-        matches[role].push({ fn, recipe, patched: fingerprint === recipe[role].patchedFingerprint });
+    for (const group of groups) for (const role of roles) {
+      const { recipe } = group;
+      const reviewed = [recipe[role], ...(recipe[role].compatibleFingerprints || [])]
+        .find(pair => [pair.fingerprint, pair.patchedFingerprint].includes(fingerprint));
+      if (reviewed) {
+        group[role].push({ fn, patched: fingerprint === reviewed.patchedFingerprint,
+          recipe: { ...recipe[role], ...reviewed }, expectedFingerprint: reviewed.patchedFingerprint });
       }
     }
   } });
-  if (!matches.legacy.length && !matches.modern.length) return { patched: source, matched: false, changed: false };
-  if (matches.legacy.length !== 1 || matches.modern.length !== 1 || matches.legacy[0].recipe !== matches.modern[0].recipe) {
+  // Versions may share one layout, but both functions must belong to one reviewed pair.
+  const unique = roles.map(role => new Set(groups.flatMap(group => group[role].map(match => match.fn))));
+  if (unique.every(nodes => nodes.size === 0)) return { patched: source, matched: false, changed: false };
+  const complete = groups.filter(group => roles.every(role => group[role].length === 1));
+  if (unique.some(nodes => nodes.size !== 1) || complete.length !== 1) {
     throw new Error('Cannot uniquely recognize both compact model picker layouts.');
   }
-  const recipe = matches.legacy[0].recipe;
+  const matches = complete[0];
+  const matchedRecipe = Object.fromEntries(roles.map(role => [role, matches[role][0].recipe]));
   const edits = [];
-  for (const role of Object.keys(matches)) {
+  for (const role of roles) {
     const match = matches[role][0];
     if (match.patched) continue;
-    const value = transformCompactFunction(source, match.fn, role, matches.modern[0].fn, recipe);
-    if (shape(parse(value).body[0]).fingerprint !== recipe[role].patchedFingerprint) throw new Error(`Unexpected transformed ${role} compact picker.`);
+    const value = transformCompactFunction(source, match.fn, role, matches.modern[0].fn, matchedRecipe);
+    if (shape(parse(value).body[0]).fingerprint !== match.expectedFingerprint) throw new Error(`Unexpected transformed ${role} compact picker.`);
     edits.push({ fn: match.fn, value });
   }
   let patched = source;

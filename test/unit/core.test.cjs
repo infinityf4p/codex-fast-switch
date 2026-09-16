@@ -95,6 +95,29 @@ test('saved default speed accepts API keys while retaining other authentication 
     }
 });
 
+test('reviewed nested model settings preserve host options and older model queries', () => {
+  const source = 'function models(host,current){const {modelSettings}=current;const serviceTierForRequest=modelSettings.serviceTier;return getModels(host);}';
+  const fn = adaptive.parse(source).body[0];
+  const target = fn.body.body[2].argument.arguments[0];
+  const expected = source.replace('getModels(host)', 'getModels({...host,additionalAvailableModels:new Set([current.modelSettings.model])})');
+  const variant = { fingerprint: adaptive.shape(fn).fingerprint,
+    patchedFingerprint: adaptive.shape(adaptive.parse(expected).body[0]).fingerprint,
+    path: adaptive.nodePath(fn, target), modelPath: ['modelSettings', 'model'] };
+  const modelRecipe = { ...recipes[2], compatibleFingerprints: [variant] };
+  for (const [input, settings] of [[source, { modelSettings: { model: 'selected-model', serviceTier: 'priority' } }],
+    [snippets[2], { model: 'selected-model' }]]) {
+    const result = adaptive.adapt(input, [modelRecipe]);
+    assert.equal(result.matches.length, 1);
+    const query = vm.runInNewContext(`(${result.patched})({hostId:'remote',enabled:true},settings)`, { settings, getModels: value => value });
+    assert.equal(query.hostId, 'remote');
+    assert.equal(query.enabled, true);
+    assert.deepEqual([...query.additionalAvailableModels], ['selected-model']);
+  }
+  assert.equal(adaptive.adapt(source.replaceAll('modelSettings', 'modelPreferences'), [modelRecipe]).matches.length, 0);
+  assert.throws(() => adaptive.adapt(source, [{ ...modelRecipe,
+    compatibleFingerprints: [{ ...variant, modelPath: ['model'] }] }]), /Unexpected transformed/);
+});
+
 test('split and renamed chunks are patched with integrity hashes and unrelated bytes preserved', async t => {
   const root = temporary(t);
   const source = path.join(root, 'source');
@@ -103,7 +126,7 @@ test('split and renamed chunks are patched with integrity hashes and unrelated b
   const unrelated = Buffer.from([0, 1, 2, 255, 8]);
   fs.writeFileSync(path.join(source, 'untouched.bin'), unrelated);
   const archive = path.join(root, 'app.asar');
-  await asar.createPackage(source, archive);
+  await finished(await asar.createPackage(source, archive));
   const plan = await adaptive.planArchive(archive, recipes);
   await assert.rejects(adaptive.planArchive(archive, recipes.map(recipe => recipe.kind === 'models'
     ? { ...recipe, requires: ['saved-request'] } : recipe)), /Cannot uniquely recognize saved-request/);
@@ -117,7 +140,7 @@ test('split and renamed chunks are patched with integrity hashes and unrelated b
   }
   await assert.rejects(adaptive.planArchive(archive, recipes), /uniquely recognize/);
   fs.copyFileSync(path.join(source, 'webview/renamed/chunk-0.js'), path.join(source, 'webview/duplicate.js'));
-  await asar.createPackage(source, archive);
+  await finished(await asar.createPackage(source, archive));
   await assert.rejects(adaptive.planArchive(archive, recipes), /uniquely recognize/);
 });
 
@@ -127,7 +150,7 @@ test('missing or damaged archive entries cannot be patched', async t => {
   fs.mkdirSync(source);
   fs.writeFileSync(path.join(source, 'test.js'), 'known bytes');
   const archive = path.join(root, 'app.asar');
-  await asar.createPackage(source, archive);
+  await finished(await asar.createPackage(source, archive));
   assert.throws(() => patchArchive(archive, 'missing', bytes => bytes), /not a packed/);
   const data = fs.readFileSync(archive);
   data[data.length - 1] ^= 1;
@@ -155,6 +178,37 @@ test('shared request gates require exactly one recognized copy in each declared 
   fs.writeFileSync(path.join(source, '.vite/build/duplicate.js'), snippets[1]);
   await pack();
   await assert.rejects(adaptive.planArchive(archive, scoped), /request logic in main/);
+});
+
+test('optional readers accept older apps but reject unrecognized or incomplete newer implementations', async t => {
+  const root = temporary(t), source = path.join(root, 'source'), archive = path.join(root, 'app.asar');
+  fs.mkdirSync(path.join(source, 'webview'), { recursive: true });
+  fs.mkdirSync(path.join(source, '.vite/build'), { recursive: true });
+  fs.writeFileSync(path.join(source, 'webview/app.js'), snippets.join('\n'));
+  const reader = snippets[1].replace('function request', 'function readServiceTier').replace('!==false;', '!==false&&host!=null;');
+  const fn = adaptive.parse(reader).body[0], base = recipes[1];
+  const target = adaptive.at(fn, base.path);
+  const patched = reader.slice(0, target.start) + adaptive.replacement(reader, fn, target, 'extra-request') + reader.slice(target.end);
+  const optional = { ...base, kind: 'extra-request', optional: true, requiredMarker: 'readServiceTier',
+    scopes: ['webview', 'main'], fingerprint: adaptive.shape(fn).fingerprint,
+    patchedFingerprint: adaptive.shape(adaptive.parse(patched).body[0]).fingerprint };
+  const supported = [...recipes, optional];
+  const pack = async () => finished(await asar.createPackage(source, archive));
+  await pack();
+  assert.equal((await adaptive.planArchive(archive, supported)).targets.length, 1);
+  const view = path.join(source, 'webview/reader.js'), main = path.join(source, '.vite/build/reader.js');
+  fs.writeFileSync(view, reader);
+  await pack();
+  await assert.rejects(adaptive.planArchive(archive, supported), /extra-request logic in main/);
+  fs.writeFileSync(main, reader);
+  await pack();
+  assert.equal((await adaptive.planArchive(archive, supported)).targets.length, 3);
+  fs.writeFileSync(view, reader.replace('host!=null', 'host!==undefined'));
+  await pack();
+  await assert.rejects(adaptive.planArchive(archive, supported), /extra-request logic in webview/);
+  fs.rmSync(main);
+  await pack();
+  await assert.rejects(adaptive.planArchive(archive, supported), /extra-request logic in webview/);
 });
 
 test('live locks exclude a second installer and abandoned locks are recovered', async t => {
@@ -187,9 +241,12 @@ test('monitor applies immediately after exit, reports failure once, then retries
   let generation = 1;
   let calls = 0;
   const notices = [];
-  const options = { now: 100000, stopped: () => {}, getStamp: () => generation, notifyUser: value => notices.push(value),
+  const options = { now: 100000, stopped: () => {}, getStamp: () => generation, updaterBusy: () => false,
+    notifyUser: value => notices.push(value),
     install: async (app, state, config) => { calls++; assert.equal(config.model, 'example-model'); throw new Error('unsupported build'); } };
-  assert.equal((await automatic.tick(root, { ...options, stopped: () => { throw Object.assign(new Error('running'), { code: 'APP_RUNNING' }); } })).status, 'waiting-for-exit');
+  const running = await automatic.tick(root, { ...options, stopped: () => { throw Object.assign(new Error('running'), { code: 'APP_RUNNING' }); } });
+  assert.equal(running.status, 'waiting-for-exit');
+  assert.equal(running.adoptUpdate, false);
   assert.equal((await automatic.tick(root, { ...options, stopped: () => { throw Object.assign(new Error('permission denied'), { code: 'EPERM' }); } })).status, 'process-check-failed');
   assert.equal(calls, 0);
   assert.equal((await automatic.tick(root, options)).status, 'failed');
@@ -207,7 +264,8 @@ test('an update disappearing during failed installation still yields a recorded 
   const root = temporary(t);
   tx.saveJson(automatic.configPath(root), { enabled: true, app: root });
   let gone = false;
-  const options = { now: 0, stopped: () => {}, notifyUser: () => {}, getStamp: () => { if (gone) throw new Error('updating'); return 1; },
+  const options = { now: 0, stopped: () => {}, updaterBusy: () => false, notifyUser: () => {},
+    getStamp: () => { if (gone) throw new Error('updating'); return 1; },
     install: async () => { gone = true; throw new Error('update in progress'); } };
   assert.equal((await automatic.tick(root, options)).status, 'failed');
 });
@@ -218,6 +276,8 @@ test('LaunchAgent runs the exit observer and only restarts after an unsuccessful
   assert.equal(plist.StartInterval, undefined);
   assert.equal(plist.RunAtLoad, true);
   assert.deepEqual(plist.KeepAlive, { SuccessfulExit: false });
+  assert.equal(plist.ProcessType, 'Interactive');
+  assert.notEqual(plist.LowPriorityIO, true);
 });
 
 test('one-shot restart-now launchd jobs are identified for removal', () => {
@@ -232,10 +292,66 @@ test('one-shot restart-now launchd jobs are identified for removal', () => {
   ]);
 });
 
+test('monitor waits while Sparkle Autoupdate is replacing the app', async t => {
+  const root = temporary(t);
+  tx.saveJson(automatic.configPath(root), { enabled: true, app: root });
+  let updaterChecks = 0;
+  const result = await automatic.tick(root, { now: 0, getStamp: () => 1,
+    stopped: () => assert.fail('must not inspect processes during an update'),
+    updaterBusy: app => { assert.equal(app, root); updaterChecks++; return true; },
+    notifyUser: () => assert.fail('Sparkle must not raise a failure dialog'),
+    install: async () => assert.fail('must not patch during an update') });
+  assert.equal(result.status, 'waiting-for-update');
+  assert.equal(result.rejectedStamp, undefined);
+  assert.equal(updaterChecks, 1);
+});
+
+test('a replaced running app is prepared and restarted under the monitor lock', async t => {
+  const root = temporary(t);
+  tx.saveJson(automatic.configPath(root), { enabled: true, app: root });
+  tx.saveJson(automatic.statusPath(root), { successStamp: JSON.stringify(1) });
+  const calls = [];
+  const result = await automatic.tick(root, { now: 1, getStamp: () => 2, updaterBusy: () => false,
+    stopped: () => { throw Object.assign(new Error('running'), { code: 'APP_RUNNING' }); },
+    restartApp: async (app, state, options) => {
+      assert.equal(app, root);
+      assert.equal((await tx.withLock(state, () => assert.fail('restart lock released'))).status, 'busy');
+      options.onPhase('staging');
+      calls.push('prepare');
+      await options.beforeQuit();
+      options.onPhase('requesting-quit');
+      calls.push('restart');
+      return { status: 'installed', reopened: true };
+    },
+    notifyUser: () => assert.fail('adopting an update must not raise a failure dialog') });
+  assert.equal(result.status, 'installed');
+  assert.equal(result.successStamp, JSON.stringify(2));
+  assert.deepEqual(calls, ['prepare', 'restart']);
+});
+
+test('Sparkle helper paths are signed inside-out and skipped when absent', () => {
+  const signing = require('../../src/platforms/macos/signing.cjs');
+  assert.deepEqual(signing.sparkleTargets('/missing-app'), []);
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'codex-fast-sparkle-'));
+  try {
+    const versioned = path.join(root, 'Contents/Frameworks/Sparkle.framework/Versions/B');
+    fs.mkdirSync(path.join(versioned, 'XPCServices'), { recursive: true });
+    fs.writeFileSync(path.join(versioned, 'Autoupdate'), '');
+    fs.mkdirSync(path.join(versioned, 'Updater.app'));
+    fs.mkdirSync(path.join(versioned, 'XPCServices/Installer.xpc'));
+    assert.deepEqual(signing.sparkleTargets(root), [
+      path.join(versioned, 'XPCServices/Installer.xpc'),
+      path.join(versioned, 'Updater.app'),
+      path.join(versioned, 'Autoupdate'),
+      path.join(root, 'Contents/Frameworks/Sparkle.framework'),
+    ]);
+  } finally { fs.rmSync(root, { recursive: true, force: true }); }
+});
+
 test('a quick manual reopen does not reject the build', async t => {
   const root = temporary(t);
   tx.saveJson(automatic.configPath(root), { enabled: true, app: root });
-  const result = await automatic.tick(root, { stopped: () => {}, getStamp: () => 1,
+  const result = await automatic.tick(root, { stopped: () => {}, getStamp: () => 1, updaterBusy: () => false,
     install: async () => { throw Object.assign(new Error('reopened'), { code: 'APP_RUNNING' }); },
     notifyUser: () => assert.fail('A normal reopen must not raise a failure dialog') });
   assert.equal(result.status, 'waiting-for-exit');

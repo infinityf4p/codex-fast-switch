@@ -6,10 +6,12 @@ const { execFileSync } = require('node:child_process');
 function cleanupSigningIdentity(state) {
   const keychain = path.join(path.resolve(state), 'signing', 'identity.keychain-db');
   if (!fs.existsSync(keychain)) return false;
-  const temporaryRoot = fs.realpathSync(os.tmpdir());
-  const relative = path.relative(temporaryRoot, fs.realpathSync(keychain));
-  if (relative.startsWith('..') || path.isAbsolute(relative) || !relative.split(path.sep)[0].startsWith('codex-') ||
-      fs.lstatSync(keychain).isSymbolicLink()) {
+  const temporaryRoots = [os.tmpdir(), '/private/tmp'].filter(root => fs.existsSync(root)).map(root => fs.realpathSync(root));
+  const owned = temporaryRoots.some(root => {
+    const relative = path.relative(root, fs.realpathSync(keychain));
+    return !relative.startsWith('..') && !path.isAbsolute(relative) && relative.split(path.sep)[0].startsWith('codex-');
+  });
+  if (!owned || fs.lstatSync(keychain).isSymbolicLink()) {
     throw new Error('Signing fixture cleanup only accepts an identity inside its own temporary test directory.');
   }
   execFileSync(path.join(__dirname, '../../build/macos/signing-helper'), ['delete', keychain], {

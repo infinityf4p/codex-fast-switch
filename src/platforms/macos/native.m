@@ -26,7 +26,7 @@ int main(int argc, const char *argv[]) {
     if (argc == 3 && strcmp(argv[1], "watch") == 0) {
         @autoreleasepool {
             NSString *path = [NSString stringWithUTF8String:argv[2]];
-            id observer = [NSWorkspace.sharedWorkspace.notificationCenter
+            id exitObserver = [NSWorkspace.sharedWorkspace.notificationCenter
                 addObserverForName:NSWorkspaceDidTerminateApplicationNotification object:nil
                 queue:NSOperationQueue.mainQueue usingBlock:^(NSNotification *notification) {
                     if (matchesApp(notification.userInfo[NSWorkspaceApplicationKey], path)) {
@@ -34,10 +34,19 @@ int main(int argc, const char *argv[]) {
                         fflush(stdout);
                     }
                 }];
+            id launchObserver = [NSWorkspace.sharedWorkspace.notificationCenter
+                addObserverForName:NSWorkspaceDidLaunchApplicationNotification object:nil
+                queue:NSOperationQueue.mainQueue usingBlock:^(NSNotification *notification) {
+                    if (matchesApp(notification.userInfo[NSWorkspaceApplicationKey], path)) {
+                        puts("launched");
+                        fflush(stdout);
+                    }
+                }];
             puts("watching");
             fflush(stdout);
             [NSRunLoop.currentRunLoop run];
-            [NSWorkspace.sharedWorkspace.notificationCenter removeObserver:observer];
+            [NSWorkspace.sharedWorkspace.notificationCenter removeObserver:exitObserver];
+            [NSWorkspace.sharedWorkspace.notificationCenter removeObserver:launchObserver];
         }
         return 0;
     }

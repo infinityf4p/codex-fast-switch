@@ -7,6 +7,21 @@
 - Add a stable Codex Fast shortcut, repair direct copy shortcuts, synchronize stopped copies before launch, and retry temporary monitor failures with backoff while removing incomplete staging data.
 - Finish monitor migration when Codex reopens after a new generation has already been published, reporting that another restart is needed instead of failing the completed installation. Normal launch activates an existing window and repairs an enabled monitor left on an older revision or layout.
 - Redirect recognized per-user official-app and copy shortcuts through the stable Fast launcher, retain original shortcut backups for uninstall, and repair version-specific shortcuts recreated by app startup. Preserve custom launch arguments, unrelated targets, shared shortcuts and Store package registrations.
+- Recognize the moved compact model controls in app 26.908.40834 (8881). macOS patch revision 10 retains the fixed Storage helper and earlier build recipes.
+- Preserve older builds that have no shared saved-speed reader. When that reader is present, require recognized copies in both main and renderer bundles and reject unknown or incomplete implementations.
+- Defer route initialization for the reviewed 8690 and 8720 bundles, avoiding an upstream circular-import startup error. macOS patch revision 9 upgrades revision 8 while retaining the fixed Storage helper.
+- Wait for Sparkle to finish replacing the bundle before reading app metadata in the restart handoff.
+- Recognize the moved native compact-picker controls in app 26.908.31457 (8690), using reviewed paths for each layout while retaining earlier builds.
+- Keep GPT-prefixed model names throughout the native picker. Without account-provided presets, use Terra Light, Sol Light, Sol Medium, Astra Light and Astra Medium for Default, filtered by available models and reasoning efforts. Preserve the native slider and Fast animations.
+- Recognize the reviewed model-settings and compact-picker structures in macOS app 26.903.71938 (8576), preserving its native per-session tier handling and preferred-model selection.
+- Preserve successful installation state when updating the macOS worker. Recover update detection from the previous installed build if an older worker erased that state, while retaining cancelled-restart and rejected-build guards.
+- Hand off Sparkle 2.9.1's automatic reopen to an acknowledged background worker: finish the official update, apply Fast, then open the same app. Keep normal update behavior if the worker cannot start or the Sparkle interface is unsupported.
+- Remove duplicate whole-chunk parsing and duplicate deep signature verification during preparation. Retain structural matching, final signature verification and rollback.
+- Remove CPU and I/O background throttling from the macOS monitor so update preparation can run promptly, and record the actual time of each patch phase.
+- Clarify that persistent local signing does not prevent Keychain prompts when an existing item also restricts access by the app's changing code hash.
+- Prepare macOS updates before requesting quit, then activate and reopen immediately. Wake on app launch or replacement and briefly check every 250 ms while an update finishes.
+- Re-sign Sparkle Autoupdate, Updater and XPC services with the same local identity so official auto-updates are not rejected for a team-ID mismatch. Wait for Autoupdate to finish, then re-apply Fast if Sparkle already relaunched the new official app.
+- Upgrade existing macOS patches to revision 6. Scope update detection to the selected app, check compatibility before automatic restart, and preserve failure notifications and per-build retry records.
 - Add a macOS one-command uninstaller that uses the installed recovery CLI, stops monitoring and restores the original app while retaining personal data, recovery records and the local signing identity.
 - Separate uninstall instructions and app-version compatibility in both READMEs.
 - Organize shared code under src/core and platform implementations under src/platforms; group auxiliary launchers, unit tests, integration flows and test support separately.

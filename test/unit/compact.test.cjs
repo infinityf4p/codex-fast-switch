@@ -97,6 +97,20 @@ test('compact adaptation is idempotent and accepts identifier and formatting cha
   assert.equal(adaptCompact(`${legacy}\n${expectedModern}`, recipe).changed, true);
 });
 
+test('reviewed compatibility pairs preserve a newer model fallback and remain idempotent', () => {
+  const newer = legacy.replace('model: input.model,', 'model: input.model ?? input.fallbackModel,');
+  const expected = expectedLegacy.replace('model: input.model,', 'model: input.model ?? input.fallbackModel,');
+  const compatible = structuredClone(recipe);
+  compatible.legacy.compatibleFingerprints = [{ fingerprint: shape(parse(newer).body[0]).fingerprint,
+    patchedFingerprint: shape(parse(expected).body[0]).fingerprint }];
+  const result = adaptCompact(`${newer}\n${modern}`, compatible);
+  assert.equal(result.changed, true);
+  assert.equal(shape(parse(result.patched).body[0]).fingerprint, shape(parse(expected).body[0]).fingerprint);
+  assert.equal(adaptCompact(result.patched, compatible).changed, false);
+  assert.equal(adaptCompact(source, compatible).changed, true);
+  assert.throws(() => adaptCompact(`${newer}\n${modern}`, recipe), /both compact/);
+});
+
 test('compact adaptation rejects missing, ambiguous, or changed known layouts', () => {
   assert.throws(() => adaptCompact(legacy, recipe), /both compact/);
   assert.throws(() => adaptCompact(`${source}\n${legacy.replace('function legacy', 'function duplicate')}`, recipe), /both compact/);
@@ -123,4 +137,44 @@ test('compact recipe variants keep both layouts from the same reviewed version',
     assert.equal(adaptCompact(result.patched, [recipe, next]).changed, false);
   }
   assert.throws(() => adaptCompact(source.replace('native-chevron', 'new-chevron'), [recipe, next]), /both compact/);
+});
+
+test('reviewed layouts can move both target and donor paths without changing their native code', () => {
+  const addStatement = code => code.replace('{', '{ const layout = input.layout;');
+  const movedLegacy = addStatement(legacy);
+  const movedModern = addStatement(modern);
+  const expected = { legacy: addStatement(expectedLegacy), modern: addStatement(expectedModern) };
+  const compatible = structuredClone(recipe);
+  for (const [role, code] of [['legacy', movedLegacy], ['modern', movedModern]]) {
+    compatible[role].compatibleFingerprints = [{
+      fingerprint: shape(parse(code).body[0]).fingerprint,
+      patchedFingerprint: shape(parse(expected[role]).body[0]).fingerprint,
+      paths: Object.fromEntries(Object.entries(recipe[role].paths).map(([key, steps]) => [key,
+        steps.map((step, index) => index === 2 ? step + 1 : step)])),
+    }];
+  }
+  const result = adaptCompact(`${movedLegacy}\n${movedModern}`, compatible);
+  assert.equal(result.changed, true);
+  assert.equal(shape(parse(result.patched).body[0]).fingerprint, compatible.legacy.compatibleFingerprints[0].patchedFingerprint);
+  assert.equal(shape(parse(result.patched).body[1]).fingerprint, compatible.modern.compatibleFingerprints[0].patchedFingerprint);
+  assert.equal(adaptCompact(result.patched, compatible).changed, false);
+  assert.equal(adaptCompact(source, compatible).changed, true);
+});
+
+test('reviewed pairs may share a modern layout without accepting duplicate functions or ambiguous pairs', () => {
+  const nextLegacy = legacy.replace('max-w-40', 'max-w-48');
+  const nextExpected = expectedLegacy.replace('max-w-40', 'max-w-48');
+  const next = structuredClone(recipe);
+  next.legacy.fingerprint = shape(parse(nextLegacy).body[0]).fingerprint;
+  next.legacy.patchedFingerprint = shape(parse(nextExpected).body[0]).fingerprint;
+  for (const input of [source, `${nextLegacy}\n${modern}`]) {
+    const result = adaptCompact(input, [recipe, next]);
+    assert.equal(result.changed, true);
+    assert.equal(adaptCompact(result.patched, [recipe, next]).changed, false);
+    assert.throws(() => adaptCompact(`${input}\n${modern.replace('function modern', 'function duplicate')}`,
+      [recipe, next]), /both compact/);
+  }
+  assert.throws(() => adaptCompact(`${source}\n${nextLegacy.replace('function legacy', 'function other')}`,
+    [recipe, next]), /both compact/);
+  assert.throws(() => adaptCompact(source, [recipe, structuredClone(recipe)]), /both compact/);
 });
