@@ -9,7 +9,7 @@ const { probeEnvironment, probeConfig, discoverModel, stopChild } = require('./p
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 
 async function healthCheck(app, { onProgress = () => {}, screenshot, model: requestedModel,
-  reasoningEffort, modelLabel, verifyCompactControl = false, compactScreenshot, colorScheme } = {}) {
+  reasoningEffort, modelLabel, verifyCompactControl = false, verifyModelPresentation = false, compactScreenshot, colorScheme } = {}) {
   if (reasoningEffort !== undefined && !['none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max', 'ultra', 'persistent'].includes(reasoningEffort)) {
     throw new Error('Invalid verification reasoning effort.');
   }
@@ -155,13 +155,14 @@ async function healthCheck(app, { onProgress = () => {}, screenshot, model: requ
       await until(() => click(`Array.from(document.querySelectorAll('[role=menuitem],button,a')).find(e=>e.textContent.trim().startsWith('Settings'))`), 'open settings');
       await until(() => evaluate('document.body?.innerText?.includes("Speed")'), 'Speed settings');
     }
-    async function inspectCompactControl(tier) {
+    async function inspectCompactControl(tier, presentationOnly = false) {
       const metrics = await evaluate(`(() => {
         const visible = e => e && e.getBoundingClientRect().width > 0 && getComputedStyle(e).visibility !== 'hidden';
         const trigger = Array.from(document.querySelectorAll('[data-composer-navigation-target="reasoning"]')).find(visible);
         if (!trigger) return null;
         const rect = e => { const r=e.getBoundingClientRect(); return {x:r.x,y:r.y,width:r.width,height:r.height}; };
-        const modelGroup = trigger.querySelector('[class*="ModelPickerTriggerModelLabel_"]');
+        const modelGroup = trigger.querySelector('[class*="ModelPickerTriggerModelLabel_"]') ||
+          trigger.querySelector('span.tabular-nums');
         const model = modelGroup?.querySelector('span.truncate.whitespace-nowrap') || modelGroup;
         const effort = trigger.querySelector('[class*="ModelPickerTriggerEffortLabel_"]') || modelGroup?.nextElementSibling;
         const icon = trigger.querySelector('svg[class*="ModelPickerTriggerInlineModeIcon_"]') || modelGroup?.querySelector('svg');
@@ -184,27 +185,30 @@ async function healthCheck(app, { onProgress = () => {}, screenshot, model: requ
       const fail = message => { throw new Error(`Compact ${tier} control: ${message}. Observed: ${JSON.stringify(metrics)}`); };
       if (!metrics) fail('native model trigger is missing');
       if (metrics.expanded !== 'false') fail('model menu is still open');
-      if (!metrics.model?.text || !metrics.effort?.text || !metrics.chevron) fail('model, reasoning effort, or chevron is missing');
+      if (!metrics.model?.text) fail('model name is missing');
       if (modelLabel && metrics.model.text !== modelLabel) fail(`expected model label ${JSON.stringify(modelLabel)}`);
-      if (metrics.model.color !== metrics.expectedTextColor || (metrics.icon && metrics.icon.color !== metrics.expectedTextColor)) fail('model or Fast icon does not use the native text color');
-      if (reasoningEffort && metrics.selectedEffort !== reasoningEffort) fail(`expected reasoning effort ${reasoningEffort}`);
       if (tier === 'Fast' && (metrics.icon?.paths !== 1 || metrics.icon.contours !== 1 || metrics.icon.fill === 'none')) fail('filled Fast icon is missing');
       if (tier === 'Standard' && metrics.icon) fail('Fast icon remains visible in Standard mode');
-      const parts = [metrics.icon, metrics.model, metrics.effort, metrics.chevron].filter(Boolean);
-      for (let index = 0; index < parts.length; index++) {
-        const rect = parts[index].rect;
-        if (rect.width <= 0 || rect.height <= 0 || rect.x < metrics.rect.x - 1 || rect.x + rect.width > metrics.rect.x + metrics.rect.width + 1) {
-          fail('content is clipped');
+      if (!presentationOnly) {
+        if (!metrics.effort?.text || !metrics.chevron) fail('reasoning effort or chevron is missing');
+        if (metrics.model.color !== metrics.expectedTextColor || (metrics.icon && metrics.icon.color !== metrics.expectedTextColor)) fail('model or Fast icon does not use the native text color');
+        if (reasoningEffort && metrics.selectedEffort !== reasoningEffort) fail(`expected reasoning effort ${reasoningEffort}`);
+        const parts = [metrics.icon, metrics.model, metrics.effort, metrics.chevron].filter(Boolean);
+        for (let index = 0; index < parts.length; index++) {
+          const rect = parts[index].rect;
+          if (rect.width <= 0 || rect.height <= 0 || rect.x < metrics.rect.x - 1 || rect.x + rect.width > metrics.rect.x + metrics.rect.width + 1) {
+            fail('content is clipped');
+          }
+          if (index && parts[index - 1].rect.x + parts[index - 1].rect.width > rect.x + 1) fail('content order overlaps');
+          if (Math.abs(rect.y + rect.height / 2 - (metrics.rect.y + metrics.rect.height / 2)) > 3) fail('content is not vertically aligned');
         }
-        if (index && parts[index - 1].rect.x + parts[index - 1].rect.width > rect.x + 1) fail('content order overlaps');
-        if (Math.abs(rect.y + rect.height / 2 - (metrics.rect.y + metrics.rect.height / 2)) > 3) fail('content is not vertically aligned');
+        if (metrics.icon && (Math.abs(metrics.icon.rect.width - 14) > 1 || Math.abs(metrics.icon.rect.height - 14) > 1)) fail('Fast icon is not compact');
+        if (metrics.selectedEffort === 'ultra') {
+          if (metrics.effort.text !== 'Ultra' || metrics.effort.color !== metrics.expectedUltraColor) fail('Ultra label does not use the native purple color');
+        }
       }
-      if (metrics.icon && (Math.abs(metrics.icon.rect.width - 14) > 1 || Math.abs(metrics.icon.rect.height - 14) > 1)) fail('Fast icon is not compact');
-      if (metrics.selectedEffort === 'ultra') {
-        if (metrics.effort.text !== 'Ultra' || metrics.effort.color !== metrics.expectedUltraColor) fail('Ultra label does not use the native purple color');
-      }
-      compactControls.push({ tier, ...metrics });
-      onProgress({ phase: 'compact-control', tier, metrics });
+      compactControls.push({ tier, presentationOnly, ...metrics });
+      onProgress({ phase: presentationOnly ? 'model-presentation' : 'compact-control', tier, metrics });
       if (compactScreenshot && tier === 'Fast') {
         const x = Math.max(0, Math.floor(metrics.rect.x - 8)), y = Math.max(0, Math.floor(metrics.rect.y - 6));
         const width = Math.min(metrics.viewport.width - x, Math.ceil(metrics.rect.x + metrics.rect.width + 8) - x);
@@ -253,7 +257,9 @@ async function healthCheck(app, { onProgress = () => {}, screenshot, model: requ
           visible(e) && /^(Stop|Interrupt)(\\b|$)/i.test(e.getAttribute('aria-label') || e.getAttribute('title') || e.textContent.trim()));
       })()`), 'composer idle after local response');
       await cdp.call('Input.dispatchMouseEvent', { type: 'mouseMoved', x: 4, y: 4 }, session);
-      if (verifyCompactControl || compactScreenshot) await inspectCompactControl(tier);
+      if (verifyCompactControl || verifyModelPresentation || compactScreenshot) {
+        await inspectCompactControl(tier, verifyModelPresentation && !verifyCompactControl);
+      }
       if (screenshot && tier === 'Fast') {
         const shot = await cdp.call('Page.captureScreenshot', { format: 'png' }, session);
         const { dir, name } = path.parse(screenshot);

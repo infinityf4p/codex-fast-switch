@@ -128,6 +128,14 @@ test('split and renamed chunks are patched with integrity hashes and unrelated b
   const archive = path.join(root, 'app.asar');
   await finished(await asar.createPackage(source, archive));
   const plan = await adaptive.planArchive(archive, recipes);
+  // macOS/default planning still rejects missing appearance features. Windows
+  // needs their identity to preserve other compatible transforms when retrying.
+  for (const [feature, icon, compact, picker] of [
+    ['fast-icon', require('../../src/core/icon-recipe.json'), null, null],
+    ['compact-model-control', null, require('../../src/core/compact-recipe.json'), null],
+    ['model-name', null, null, [require('../../src/core/picker-recipe.json')[0]]],
+  ]) await assert.rejects(adaptive.planArchive(archive, recipes, icon, compact, picker),
+    { code: 'UNSUPPORTED_APPEARANCE', appearance: feature });
   await assert.rejects(adaptive.planArchive(archive, recipes.map(recipe => recipe.kind === 'models'
     ? { ...recipe, requires: ['saved-request'] } : recipe)), /Cannot uniquely recognize saved-request/);
   assert.equal(plan.targets.length, 3);

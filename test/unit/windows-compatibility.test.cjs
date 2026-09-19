@@ -69,18 +69,41 @@ test('unknown updater interfaces and ambiguous managers are not patched', () => 
   ]) assert.throws(() => adapt(source, {}, new Set()), { code: 'UNSUPPORTED_UPDATER' });
 });
 
-test('Windows appearance fallback replans the original archive while retaining Fast checks', async () => {
+test('a changed Windows layout retains the matching model names, filled icon and Fast checks', async () => {
   const calls = [];
-  const prepared = { targets: [{ entry: 'request.js' }], checks: ['Fast sends priority', 'Standard omits tier'] };
+  const prepared = { targets: [{ entry: 'request.js' }, { entry: 'appearance.js', kinds: ['model-name', 'fast-icon'] }],
+    checks: ['Fast sends priority', 'Standard omits tier'] };
   const result = await planWindowsArchive('original.asar', { plan: async (...args) => {
     calls.push(args);
-    if (calls.length === 1) throw Object.assign(new Error('Changed native layout'), { code: 'UNSUPPORTED_APPEARANCE' });
+    if (calls.length === 1) throw Object.assign(new Error('Changed native layout'),
+      { code: 'UNSUPPORTED_APPEARANCE', appearance: 'compact-model-control' });
     return prepared;
   } });
-  assert.deepEqual(calls, [['original.asar'], ['original.asar', undefined, null, null, null]]);
+  assert.deepEqual(calls, [['original.asar'], ['original.asar', undefined, undefined, null,
+    require('../../src/core/picker-recipe.json')]]);
   assert.deepEqual(result.targets, prepared.targets);
   assert.deepEqual(result.checks, prepared.checks);
   assert.equal(result.compatibility.nativeAppearance, true);
+  assert.deepEqual(result.compatibility.nativeAppearanceFeatures, ['compact-model-control']);
+});
+
+test('independent appearance failures retain unaffected transforms and cannot loop on the same failure', async () => {
+  const failures = ['fast-icon', 'default-model-presets'];
+  const result = await planWindowsArchive('original.asar', { plan: async (_archive, _gates, icon, compact, picker) => {
+    const feature = failures.shift();
+    if (feature) throw Object.assign(new Error(feature), { code: 'UNSUPPORTED_APPEARANCE', appearance: feature });
+    assert.equal(icon, null);
+    assert.equal(compact, undefined);
+    assert.deepEqual(picker.map(recipe => recipe.kind), ['model-name']);
+    return { targets: [], checks: [] };
+  } });
+  assert.deepEqual(result.compatibility.nativeAppearanceFeatures, ['fast-icon', 'default-model-presets']);
+  for (const appearance of ['compact-model-control', 'model-picker', 'unknown-feature']) {
+    let calls = 0;
+    const failure = Object.assign(new Error('Repeated or unknown failure'), { code: 'UNSUPPORTED_APPEARANCE', appearance });
+    await assert.rejects(planWindowsArchive('original.asar', { plan: async () => { calls++; throw failure; } }), error => error === failure);
+    assert.equal(calls, appearance === 'unknown-feature' ? 1 : 2);
+  }
 });
 
 test('appearance fallback cannot suppress unsupported Fast request logic', async () => {
@@ -88,7 +111,8 @@ test('appearance fallback cannot suppress unsupported Fast request logic', async
     let calls = 0;
     const failure = new Error('Unsupported Fast request');
     await assert.rejects(planWindowsArchive('original.asar', { plan: async () => {
-      if (++calls === 1 && appearanceFirst) throw Object.assign(new Error('Changed layout'), { code: 'UNSUPPORTED_APPEARANCE' });
+      if (++calls === 1 && appearanceFirst) throw Object.assign(new Error('Changed layout'),
+        { code: 'UNSUPPORTED_APPEARANCE', appearance: 'compact-model-control' });
       throw failure;
     } }), error => error === failure);
     assert.equal(calls, appearanceFirst ? 2 : 1);

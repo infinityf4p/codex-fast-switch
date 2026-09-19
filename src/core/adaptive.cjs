@@ -189,11 +189,12 @@ async function planArchive(archive, recipes = defaultRecipes, iconRecipe = recip
   let iconMatches = 0;
   let compactMatches = 0;
   const pickerMatches = [];
-  const appearance = action => {
+  const appearance = (feature, action) => {
     try { return action(); }
-    catch (error) { throw Object.assign(error, { code: 'UNSUPPORTED_APPEARANCE' }); }
+    catch (error) { throw Object.assign(error, { code: 'UNSUPPORTED_APPEARANCE', appearance: feature }); }
   };
-  const unsupportedAppearance = message => Object.assign(new Error(message), { code: 'UNSUPPORTED_APPEARANCE' });
+  const unsupportedAppearance = (feature, message) => Object.assign(new Error(message),
+    { code: 'UNSUPPORTED_APPEARANCE', appearance: feature });
   for (const entry of files) {
     const scope = entry.replaceAll('\\', '/').startsWith('.vite/') ? 'main' : 'webview';
     const scopedRecipes = recipes.filter(recipe => (recipe.scopes || ['webview']).includes(scope));
@@ -211,11 +212,11 @@ async function planArchive(archive, recipes = defaultRecipes, iconRecipe = recip
       !(pickerRecipes && source.includes('stripGptPrefix'))) continue;
     const result = adapt(source, scopedRecipes);
     const icon = scope === 'webview' && iconRecipe && source.includes('serviceTierIconKind')
-      ? appearance(() => adaptFastIcon(result.patched, iconRecipe)) : null;
+      ? appearance('fast-icon', () => adaptFastIcon(result.patched, iconRecipe)) : null;
     const compact = scope === 'webview' && compactRecipe !== null && source.includes('serviceTierIconKind')
-      ? appearance(() => adaptCompact(icon?.patched ?? result.patched, compactRecipe)) : null;
+      ? appearance('compact-model-control', () => adaptCompact(icon?.patched ?? result.patched, compactRecipe)) : null;
     const picker = scope === 'webview' && pickerRecipes && source.includes('stripGptPrefix')
-      ? appearance(() => adaptPicker(compact?.patched ?? icon?.patched ?? result.patched, pickerRecipes)) : null;
+      ? appearance('model-picker', () => adaptPicker(compact?.patched ?? icon?.patched ?? result.patched, pickerRecipes)) : null;
     if (icon?.matched) iconMatches++;
     if (compact?.matched) compactMatches++;
     pickerMatches.push(...(picker?.matches ?? []));
@@ -235,11 +236,11 @@ async function planArchive(archive, recipes = defaultRecipes, iconRecipe = recip
       throw new Error(`Cannot uniquely recognize ${kind} logic in ${scope}. The official app will be kept unchanged.`);
     }
   }
-  if (iconRecipe && iconMatches !== 1) throw unsupportedAppearance('Cannot uniquely recognize the Fast icon. The official app will be kept unchanged.');
-  if (compactRecipe !== null && compactMatches !== 1) throw unsupportedAppearance('Cannot uniquely recognize the compact model control. The official app will be kept unchanged.');
+  if (iconRecipe && iconMatches !== 1) throw unsupportedAppearance('fast-icon', 'Cannot uniquely recognize the Fast icon. The official app will be kept unchanged.');
+  if (compactRecipe !== null && compactMatches !== 1) throw unsupportedAppearance('compact-model-control', 'Cannot uniquely recognize the compact model control. The official app will be kept unchanged.');
   for (const recipe of pickerRecipes ?? []) {
     if (pickerMatches.filter(match => match.kind === recipe.kind).length !== 1) {
-      throw unsupportedAppearance(`Cannot uniquely recognize ${recipe.kind} logic. The official app will be kept unchanged.`);
+      throw unsupportedAppearance(recipe.kind, `Cannot uniquely recognize ${recipe.kind} logic. The official app will be kept unchanged.`);
     }
   }
   if (recipes === defaultRecipes) targets.push(...require('./startup.cjs').planStartup(archive, files));

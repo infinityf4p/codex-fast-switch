@@ -1,5 +1,13 @@
 # Tested builds
 
+## 2026-09-19: Windows model names and filled Fast glyph
+
+Windows patch revision **6** on app **26.911.61220 (9647)** retains the macOS model-name and filled-icon transformations when only the compact layout changes. Revision 5 had disabled all appearance patches after one unsupported layout; revision 6 records and skips individual incompatible features. On this build only `compact-model-control` uses native appearance. The existing model-name, Default preset and Fast-icon recipes match without new build-specific fingerprints.
+
+An isolated copy of the installed revision-5 app updated to revision 6 through its native Update button, preserved its profile and reported no remaining update. The subsequent UI probe observed **GPT-6 Astra** in both modes and a filled, single-contour Fast glyph with `viewBox="0 0 24 24"`; Standard hid the glyph. Fast sent `priority` and Standard omitted the tier to the loopback provider. The native layout uses a 16px icon; the older 14px compact spacing, colors and chevron were not applied or claimed as verified on this build.
+
+All test copies were removed. The personal app/monitor processes, active generation, configuration and existing shortcut remained unchanged during the test. The local suite passed **135 tests**, with **11 platform-specific skips** and **0 failures**; source and PowerShell syntax checks passed.
+
 ## 2026-09-19: Windows 9647 and update compatibility
 
 Verification used Windows x64, Store package **26.911.7940.0**, app **26.911.61220 (9647)** and Windows patch revision **5**. The installed previous Fast app was **26.908.40834 (8881)**, revision **4**.

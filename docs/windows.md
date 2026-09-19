@@ -16,7 +16,7 @@ The Start menu shortcut launches the installed worker at its stable path and use
 
 Original links are backed up under `agent/shortcut-backups` before replacement. Uninstall restores their exact bytes when they still point to Fast; it preserves subsequent user changes to unrelated targets. The monitor repairs shortcuts rewritten by app startup during its regular checks and leaves unchanged links untouched. Shared all-user shortcuts and Store-generated application registrations are outside this per-user shortcut operation. A pin to the packaged Store entry needs to be replaced with the Codex Fast shortcut; changing a `.lnk` does not replace that package registration.
 
-Run a revision-5 `install.cmd` once to migrate older tools. Compatible future official builds can then use the same installed helper. Microsoft Store downloads remain separate from the local copy update. See [tested builds](tested-builds.md) for real update and request checks and their limitations.
+Run a revision-6 `install.cmd` once to migrate older tools. Compatible future official builds can then use the same installed helper. Microsoft Store downloads remain separate from the local copy update. See [tested builds](tested-builds.md) for real update and request checks and their limitations.
 
 ## Fast UI
 
@@ -24,7 +24,7 @@ The Fast UI uses the same transformations as macOS v0.2.4 (`87060bb`), including
 
 Revision 4 adds reviewed fingerprints for the reorganized picker and nested model settings in app 8881. The new shared request path also permits API-key accounts to read the saved speed; its main-process and renderer copies must both match their reviewed function fingerprint. Existing Fast policy restrictions, Copilot selection and personal-access-token restrictions remain in place. It retains the same Fast glyph, full model label and compact-control transformations for older builds. Run **install.cmd** or **Apply and Restart.cmd** to update an older patch and its enabled monitor.
 
-Starting with revision 5, cosmetic recognition is optional on Windows. If the icon, compact picker or model-label styling changes, the script replans the original archive with native appearance and still requires all Fast gate and request checks. `doctor` and the installed generation's `compatibility.nativeAppearance` field report this fallback. Missing or ambiguous core Fast logic still stops installation. macOS retains its existing appearance requirements.
+Starting with revision 5, cosmetic recognition is optional on Windows. Revision 6 falls back only for the incompatible feature: a changed compact layout no longer discards recognized full model names, filled Fast icons or Default model presets. On build 9647, this preserves **GPT-6 Astra** and the bundled solid Fast glyph using the same transformations as macOS, while retaining the new native layout. The script replans the original archive and still requires all Fast gate and request checks. `doctor` and the installed generation's `compatibility.nativeAppearanceFeatures` list identify which features use native appearance. Missing or ambiguous core Fast logic still stops installation. macOS retains its existing appearance requirements.
 
 ## Requirements
 

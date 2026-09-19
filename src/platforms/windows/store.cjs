@@ -9,7 +9,7 @@ const { patchArchive, sha256 } = require('../../core/archive.cjs');
 const { saveJson, readJson, withLock } = require('../../core/state.cjs');
 
 const PATCH_ID = 'codex-fast-switch-windows-v1';
-const PATCH_REVISION = 5;
+const PATCH_REVISION = 6;
 const configPath = state => path.join(state, 'windows.json');
 const activePath = state => path.join(state, 'windows-active.json');
 const statusPath = state => path.join(state, 'windows-status.json');

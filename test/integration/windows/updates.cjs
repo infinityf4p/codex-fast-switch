@@ -107,7 +107,7 @@ async function run(source, artifacts, previousState) {
   const env = { ...probeEnvironment(root), ProgramFiles: process.env.ProgramFiles };
   const progress = value => console.log(JSON.stringify(value));
   const report = { passed: false, source: platform.metadata(source), root, artifacts,
-    trigger: previousState ? 'previous installed Fast copy to a newer official app' : 'same-version official snapshot at a different source path',
+    trigger: previousState ? 'previous installed Fast copy to the latest app and patch revision' : 'same-version official snapshot at a different source path',
     officialDownloadTested: false, modelEndpoint: 'loopback-mock' };
   const diagnostics = [];
   const server = http.createServer(async (req, res) => {
@@ -253,8 +253,11 @@ async function run(source, artifacts, previousState) {
       // Exercise the newly patched renderer and request gates after the upgrade.
       platform.requestQuit([active.app]);
       await until(() => !platform.processes([active.app]).length, 'updated test app exits before the request probe');
+      const verifyModelPresentation = !active.compatibility?.nativeAppearanceFeatures?.some(feature => ['fast-icon', 'model-name'].includes(feature));
       report.fastMode = await require('../../support/health.cjs').healthCheck(active.app, { onProgress: progress,
         screenshot: path.join(artifacts, 'updated-fast-settings.png'),
+        model, modelLabel: verifyModelPresentation && model === 'gpt-6-astra' ? 'GPT-6 Astra' : undefined,
+        verifyModelPresentation,
         verifyCompactControl: !active.compatibility?.nativeAppearance });
     }
     report.passed = true;
