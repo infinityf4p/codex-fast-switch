@@ -211,6 +211,7 @@ test('update installation waits for exit before publishing and reopening the new
   const userData = path.join(f.root, 'profile');
   await updates.install(f.state, f.running.id, {
     resolve: () => f.source, verify: () => {}, same: () => true, stamp: () => '2',
+    preflight: async source => { assert.equal(source, f.source); events.push('preflight'); },
     ready: async () => { events.push('ready'); return userData; },
     stopped: apps => { if (apps.includes(f.running.app) && !exited) throw Object.assign(new Error('running'), { code: 'APP_RUNNING' }); },
     wait: async () => { events.push('exit'); exited = true; },
@@ -223,7 +224,7 @@ test('update installation waits for exit before publishing and reopening the new
     },
     open: (app, options) => { assert.equal(app, next.app); assert.equal(options.userData, userData); events.push('open'); },
   });
-  assert.deepEqual(events, ['ready', 'exit', 'install', 'open']);
+  assert.deepEqual(events, ['preflight', 'ready', 'exit', 'install', 'open']);
   assert.equal(store.readOptional(updates.jobPath(f.state)).status, 'installed');
 });
 
@@ -231,6 +232,7 @@ test('failed updates preserve the pointer and reopen the old copy after exit', a
   const f = fixture(t), opened = [];
   await assert.rejects(updates.install(f.state, f.running.id, {
     resolve: () => f.source, verify: () => {}, same: () => true, stopped: () => {},
+    preflight: async () => {},
     ready: async () => path.join(f.root, 'profile'),
     installCopy: async () => { throw Object.assign(new Error('Disk full'), { code: 'ENOSPC' }); },
     open: app => opened.push(app),
@@ -238,6 +240,32 @@ test('failed updates preserve the pointer and reopen the old copy after exit', a
   assert.deepEqual(opened, [f.running.app]);
   assert.equal(store.checkedActive(f.state).id, f.running.id);
   assert.equal(store.readOptional(updates.jobPath(f.state)).error, 'Disk full');
+});
+
+test('unsupported updates fail before signaling readiness or closing the running app', async t => {
+  const f = fixture(t);
+  await assert.rejects(updates.install(f.state, f.running.id, {
+    resolve: () => f.source, verify: () => {}, same: () => true, stopped: () => {},
+    preflight: async () => { throw Object.assign(new Error('Unsupported request logic'), { code: 'UNSUPPORTED_PATCH' }); },
+    ready: () => assert.fail('must not ask the app to quit'),
+    installCopy: () => assert.fail('must not publish an incompatible copy'),
+    open: () => assert.fail('the existing app is still running'),
+  }), { code: 'UNSUPPORTED_PATCH' });
+  assert.equal(store.checkedActive(f.state).id, f.running.id);
+  const job = store.readOptional(updates.jobPath(f.state));
+  assert.equal(job.status, 'failed');
+  assert.equal(job.code, 'UNSUPPORTED_PATCH');
+});
+
+test('installer and manual restart also check compatibility before quitting', async t => {
+  const f = fixture(t);
+  await assert.rejects(launch(f.state, f.source, { restart: true,
+    preflight: async source => { assert.equal(source, f.source); throw new Error('Unsupported request logic'); },
+    quit: () => assert.fail('must not quit before compatibility checks pass'),
+    install: () => assert.fail('must not publish an incompatible copy'),
+    open: () => assert.fail('the existing app is still running'),
+  }), /Unsupported request logic/);
+  assert.equal(store.checkedActive(f.state).id, f.running.id);
 });
 
 test('temporary monitoring failures retry after backoff without waiting for a new official build', async t => {
@@ -281,6 +309,7 @@ test('setup finishes configuration and monitoring when another app reopens after
   store.saveJson(store.configPath(f.state), { enabled: true, workerRevision: 2, autoDiscover: true });
   let reopened = false;
   t.mock.method(store, 'resolveSource', () => f.source);
+  t.mock.method(store, 'doctor', async () => ({ status: 'recognized' }));
   t.mock.method(platform, 'processes', () => reopened ? [{ path: platform.binaryPath(f.source) }] : []);
   t.mock.method(platform, 'openApp', () => assert.fail('must not open another default-profile app'));
   t.mock.method(launcher, 'install', async () => {

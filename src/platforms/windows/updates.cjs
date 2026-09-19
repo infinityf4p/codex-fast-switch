@@ -49,7 +49,7 @@ function check(state, id, { resolve = store.resolveSource, metadata = platform.m
 
 async function install(state, id, { ready, installCopy = launcher.install, resolve = store.resolveSource,
   verify = platform.verify, stopped = platform.assertStopped, same = platform.same, open = platform.openApp,
-  stamp = platform.stamp, now = Date.now, wait = delay, timeoutMs = 120000 } = {}) {
+  preflight = store.doctor, stamp = platform.stamp, now = Date.now, wait = delay, timeoutMs = 120000 } = {}) {
   const deadline = now() + timeoutMs;
   while (true) {
     const result = await store.withLock(state, async () => {
@@ -59,12 +59,16 @@ async function install(state, id, { ready, installCopy = launcher.install, resol
       verify(source);
       if (!same(running.app, running.patched)) throw new Error('The running copy changed. Run install.cmd again.');
       stopped([source]);
-      const job = { id: crypto.randomUUID(), fromId: id, status: 'waiting-for-exit', startedAt: new Date(now()).toISOString() };
+      const job = { id: crypto.randomUUID(), fromId: id, status: 'preparing', startedAt: new Date(now()).toISOString() };
       const save = extra => { Object.assign(job, extra, { checkedAt: new Date(now()).toISOString() }); store.saveJson(jobPath(state), job); };
       let userData;
       let exited = false;
       try {
         save({});
+        // Check compatibility while the user's app is still running. The helper
+        // must not signal readiness (and allow quit) for an unsupported update.
+        await preflight(source);
+        save({ status: 'waiting-for-exit' });
         userData = await ready();
         if (typeof userData !== 'string' || !path.isAbsolute(userData) || /[\x00-\x1f"]/u.test(userData)) {
           throw new Error('Invalid application profile directory.');

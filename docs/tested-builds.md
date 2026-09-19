@@ -1,5 +1,21 @@
 # Tested builds
 
+## 2026-09-19: Windows 9647 and update compatibility
+
+Verification used Windows x64, Store package **26.911.7940.0**, app **26.911.61220 (9647)** and Windows patch revision **5**. The installed previous Fast app was **26.908.40834 (8881)**, revision **4**.
+
+- Revision 4 rejected the new runtime because its EXE/DLL hashes were not listed. Revision 5 verified all three OpenAI executable signatures and the matching EXE/DLL versions without adding the new build's hashes. The copied EXE and DLL retained their official signatures. Embedded-manifest validation remains required whenever present.
+- The updater's initializer changed but its interface passed the new structural checks. Fast logic passed all 12 local cases. Changed compact-picker styling selected native appearance automatically, without adding 9647 cosmetic fingerprints or changing macOS requirements.
+- A disposable copy of 8881 clicked its native Update button, checked compatibility before quitting, installed 9647 and reopened with the same isolated profile marker. The updated generation reported no remaining update. A separate UI probe then selected Fast and Standard and completed loopback responses with `gpt-6-astra`: Fast sent `service_tier: "priority"`; Standard omitted it.
+- The first run completed installation and relaunch but its request probe timed out because the test located the model label through the old CSS class. The native Fast icon was visible. After updating the test selector for the native model-label container, a fresh complete run passed both request checks. Native appearance was tested; the old compact styling assertions were deliberately inapplicable.
+- Normal app initialization was allowed, and the first probe logged an upstream primary-runtime download checksum mismatch. No download verification was bypassed. Model requests used a dummy key and a loopback provider. The test did not download or install a Microsoft Store package or verify a future app build.
+
+Unit regressions cover new signed runtime versions, invalid signatures and mismatched binaries, changed updater implementations, incompatible interfaces, appearance fallback without suppressing Fast failures, and compatibility failure before Quit in both native update and installer paths.
+
+The final local suite passed **134 tests**, with **11 platform-specific skips** and **0 failures**. Source and PowerShell syntax checks and Windows packaging passed. Both integration runs removed their test copies and preserved the personal app/monitor processes, active record, monitor configuration and existing ChatGPT shortcut.
+
+The revision-5 helper was then deployed to the personal installation. Its installed files matched the source; compatibility recognition accepted 9647, and the update check reported it available with no recorded failure. One replacement monitor was running. The personal app retained its PID and creation time, active 8881 generation and patched file hashes; the official files were unchanged. The app can use its next native Update click to activate 9647 without running the installer again.
+
 ## 2026-09-16: repeated Windows update prompt
 
 On the personal **26.908.40834 (8881)** installation, the native updater completed with the same active generation but continued reporting an update. The official files matched the installed original fingerprints; only the change timestamp of the 104-byte `owl-shell-runtime.json` file differed. Timestamp changes now trigger content comparison for the affected files instead of marking the build as new.

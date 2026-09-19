@@ -47,7 +47,9 @@ try { switch ($Action) {
     'signature' {
         $result = @(foreach ($file in $data.files) {
             $signature = Get-AuthenticodeSignature -LiteralPath $file
-            @{ file = $file; status = $signature.Status.ToString(); subject = $signature.SignerCertificate.Subject }
+            $version = [Diagnostics.FileVersionInfo]::GetVersionInfo($file)
+            @{ file = $file; status = $signature.Status.ToString(); subject = $signature.SignerCertificate.Subject;
+                fileVersion = $version.FileVersion; productName = $version.ProductName }
         })
         ConvertTo-Json -InputObject $result -Compress
     }

@@ -254,7 +254,8 @@ async function run(source, artifacts, previousState) {
       platform.requestQuit([active.app]);
       await until(() => !platform.processes([active.app]).length, 'updated test app exits before the request probe');
       report.fastMode = await require('../../support/health.cjs').healthCheck(active.app, { onProgress: progress,
-        screenshot: path.join(artifacts, 'updated-fast-settings.png'), verifyCompactControl: true });
+        screenshot: path.join(artifacts, 'updated-fast-settings.png'),
+        verifyCompactControl: !active.compatibility?.nativeAppearance });
     }
     report.passed = true;
   } catch (error) {

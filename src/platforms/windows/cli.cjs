@@ -25,7 +25,7 @@ async function quitAndWait(apps, { onPhase = () => {}, timeoutMs = 30000,
 
 async function launch(state, source, { restart = false, onPhase = () => {}, timeoutMs = 30000,
   processes = platform.processes, quit = platform.requestQuit, open = platform.openApp, install = store.install,
-  now = Date.now, wait = delay, same = platform.same, verify = platform.verify } = {}) {
+  now = Date.now, wait = delay, same = platform.same, verify = platform.verify, preflight = store.doctor } = {}) {
   const active = store.checkedActive(state);
   const apps = [source, active?.app];
   if (!restart) {
@@ -50,6 +50,8 @@ async function launch(state, source, { restart = false, onPhase = () => {}, time
     open(active.app);
     return { status: 'opened', app: active.app };
   }
+  onPhase('checking-compatibility');
+  await preflight(source);
   const running = await quitAndWait(apps, { onPhase, timeoutMs, processes, quit, now, wait });
   const previousApp = running.some(item => item.path.toLowerCase() === platform.binaryPath(active?.app || source).toLowerCase()) && active ? active.app : source;
   try {

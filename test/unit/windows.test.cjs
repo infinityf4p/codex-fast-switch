@@ -148,7 +148,7 @@ test('Windows CLI preserves the failure phase and message for diagnosis', { skip
     error => error.code === 'WINDOWS_NATIVE_FAILED' && !error.message.includes('-Payload'));
 });
 
-test('reviewed Owl runtimes without an embedded manifest preserve executable bytes and reject mismatched binaries', async t => {
+test('Owl runtimes without an embedded manifest require signature verification and preserve executable bytes', async t => {
   const f = await fixture(t);
   const executableFile = path.join(f.source, 'ChatGPT.exe');
   const parsed = integrity.read(fs.readFileSync(executableFile));
@@ -156,21 +156,21 @@ test('reviewed Owl runtimes without an embedded manifest preserve executable byt
   parsed.resources.outputResource(parsed.executable);
   fs.writeFileSync(executableFile, Buffer.from(parsed.executable.generate()));
   const original = fs.readFileSync(executableFile);
-  assert.throws(() => integrity.verify(f.source), { code: 'UNSUPPORTED_INTEGRITY' });
-  const chromeFile = path.join(f.source, 'chrome.dll');
-  const runtimes = new Map([[sha256(original), sha256(fs.readFileSync(chromeFile))]]);
-  const before = integrity.verify(f.source, runtimes);
+  let verified = 0;
+  const options = { verifyRuntime: app => { assert.equal(app, f.source); verified++; } };
+  const rejected = { verifyRuntime: () => { throw new Error('Invalid signature or mismatched runtime'); } };
+  assert.throws(() => integrity.verify(f.source, rejected), { code: 'UNSUPPORTED_INTEGRITY' });
+  const before = integrity.verify(f.source, options);
   assert.equal(before.mode, 'owl-runtime');
   patchArchive(platform.archivePath(f.source), 'untouched.txt', () => Buffer.from('patched resource'));
-  const result = integrity.patch(f.source, before.headerSha256, runtimes);
+  const result = integrity.patch(f.source, before.headerSha256, options);
   assert.equal(result.mode, 'owl-runtime');
   assert.equal(result.executableSignature, 'valid-openai');
   assert.notEqual(result.headerSha256, before.headerSha256);
   assert.deepEqual(fs.readFileSync(executableFile), original);
-  fs.appendFileSync(chromeFile, 'changed');
-  assert.throws(() => integrity.verify(f.source, runtimes), { code: 'UNSUPPORTED_INTEGRITY' });
-  fs.appendFileSync(executableFile, 'changed');
-  assert.throws(() => integrity.read(fs.readFileSync(executableFile), runtimes), { code: 'UNSUPPORTED_INTEGRITY' });
+  assert.equal(verified, 2);
+  assert.throws(() => integrity.patch(f.source, before.headerSha256, rejected), { code: 'UNSUPPORTED_INTEGRITY' });
+  assert.deepEqual(fs.readFileSync(executableFile), original);
 });
 
 test('a new official version gets a new generation without modifying the previous copy', async t => {
@@ -280,6 +280,7 @@ test('Windows restart cancellation never patches or force terminates the app', a
   let time = 0;
   let quits = 0;
   await assert.rejects(launch(f.state, f.source, { restart: true, timeoutMs: 500,
+    preflight: async () => {},
     processes: () => [{ path: platform.binaryPath(f.source) }], quit: () => { quits++; },
     now: () => time, wait: async ms => { time += ms; },
     install: () => assert.fail('must not install'), open: () => assert.fail('must not launch') }), { code: 'QUIT_TIMEOUT' });
@@ -292,6 +293,7 @@ test('Windows restart reopens the previous target after a failed installation', 
   let running = true;
   const opened = [];
   await assert.rejects(launch(f.state, f.source, { restart: true,
+    preflight: async () => {},
     processes: () => running ? [{ path: platform.binaryPath(f.source) }] : [],
     quit: () => { running = false; }, open: app => opened.push(app),
     install: async () => { throw new Error('unsupported update'); } }), /unsupported update/);

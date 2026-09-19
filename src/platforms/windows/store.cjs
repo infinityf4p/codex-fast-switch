@@ -4,12 +4,12 @@ const crypto = require('node:crypto');
 const platform = require('./platform.cjs');
 const integrity = require('./integrity.cjs');
 const updater = require('./updater.cjs');
-const { planArchive } = require('../../core/adaptive.cjs');
+const { planWindowsArchive: planArchive } = require('./plan.cjs');
 const { patchArchive, sha256 } = require('../../core/archive.cjs');
 const { saveJson, readJson, withLock } = require('../../core/state.cjs');
 
 const PATCH_ID = 'codex-fast-switch-windows-v1';
-const PATCH_REVISION = 4;
+const PATCH_REVISION = 5;
 const configPath = state => path.join(state, 'windows.json');
 const activePath = state => path.join(state, 'windows-active.json');
 const statusPath = state => path.join(state, 'windows-status.json');
@@ -113,6 +113,7 @@ async function install(source, state, { onPhase = () => {}, verify = platform.ve
   fs.mkdirSync(directory, { recursive: true });
   if (!contained(fs.realpathSync(state), fs.realpathSync(directory))) throw new Error('The versions directory must stay inside the state directory.');
   const record = { patchId: PATCH_ID, revision: PATCH_REVISION, id, app, source, original,
+    ...(prepared.compatibility ? { compatibility: prepared.compatibility } : {}),
     sourceStamp: platform.stamp(source), ...info, phase: 'staging' };
   const journal = path.join(directory, 'record.json');
   saveJson(journal, record);
@@ -172,6 +173,7 @@ async function doctor(source) {
   const prepared = await planArchive(platform.archivePath(source));
   const targets = [...prepared.targets, ...updater.planArchive(platform.archivePath(source), {})];
   return { status: 'recognized', app: source, ...info, mode: 'local-copy', originalUnchanged: true, gateCases: prepared.checks.length,
+    compatibility: prepared.compatibility || { nativeAppearance: false },
     targets: targets.map(target => ({ entry: target.entry.replaceAll('\\', '/'), kinds: target.kinds })) };
 }
 module.exports = { PATCH_ID, PATCH_REVISION, configPath, activePath, statusPath, readOptional, checkedActive, status, resolveSource,

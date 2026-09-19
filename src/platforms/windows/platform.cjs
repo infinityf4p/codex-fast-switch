@@ -76,16 +76,19 @@ const fingerprint = app => Object.fromEntries(identityFiles().map(file => [file,
 function same(app, expected) {
   try { return JSON.stringify(fingerprint(app)) === JSON.stringify(expected); } catch { return false; }
 }
+function verifySignatures(app, options) {
+  const files = ['ChatGPT.exe', 'chrome.dll', 'resources/codex.exe'].map(file => path.join(app, file));
+  const signatures = native('signature', { files });
+  require('./signatures.cjs').validateSignatures(files, signatures, options);
+}
+function verifySignedRuntime(app) {
+  metadata(app);
+  verifySignatures(app, { matchingRuntime: true });
+}
 function verify(app, { patched = false } = {}) {
   const info = metadata(app);
   const archiveIntegrity = require('./integrity.cjs').verify(app);
-  const files = ['ChatGPT.exe', 'chrome.dll', 'resources/codex.exe'].map(file => path.join(app, file));
-  const signatures = native('signature', { files });
-  if (!Array.isArray(signatures) || signatures.length !== files.length || signatures.some((signature, index) =>
-    signature.file !== files[index] || (patched && index === 0 && archiveIntegrity.mode === 'embedded' ? signature.status !== 'NotSigned' :
-      signature.status !== 'Valid' || !/(?:^|,\s*)O="?OpenAI OpCo, LLC"?(?:,|$)/.test(signature.subject || '')))) {
-    throw new Error('The Windows runtime must have valid OpenAI Authenticode signatures.');
-  }
+  if (archiveIntegrity.mode === 'embedded') verifySignatures(app, { unsignedExecutable: patched });
   return info;
 }
 function processPaths(apps) {
@@ -110,4 +113,4 @@ function assertRuntime(node) {
   return node;
 }
 module.exports = { DEFAULT_STATE, nativeScript, native, requireWindows, metadata, normalizeApp, discoverApp, archivePath,
-  binaryPath, identityFiles, stamp, fingerprint, same, verify, processes, assertStopped, requestQuit, openApp, assertRuntime };
+  binaryPath, identityFiles, stamp, fingerprint, same, verify, verifySignedRuntime, processes, assertStopped, requestQuit, openApp, assertRuntime };

@@ -232,7 +232,8 @@ async function healthCheck(app, { onProgress = () => {}, screenshot, model: requ
         const trigger = Array.from(document.querySelectorAll('[data-composer-navigation-target="reasoning"]'))
           .find(e => e.getBoundingClientRect().width > 0);
         if (!trigger || trigger.disabled || trigger.getAttribute('aria-disabled') === 'true') return false;
-        const group = trigger.querySelector('[class*="ModelPickerTriggerModelLabel_"]');
+        const group = trigger.querySelector('[class*="ModelPickerTriggerModelLabel_"]') ||
+          trigger.querySelector('span.tabular-nums');
         const icon = trigger.querySelector('svg[class*="ModelPickerTriggerInlineModeIcon_"]') || group?.querySelector('svg');
         return Boolean(icon) === ${tier === 'Fast'};
       })()`), `${tier} composer selection`);

@@ -4,6 +4,7 @@ const walk = require('acorn-walk');
 const { parse, shape } = require('../../core/adaptive.cjs');
 const { sha256 } = require('../../core/archive.cjs');
 const createUpdater = require('./updater-client.cjs');
+const { supportsContract } = require('./updater-contract.cjs');
 
 const fingerprints = new Set([
   '904d7d58609b8cef3a887aa15df7d0415aec8ebc0b143f1cf6cd70e673d1cd33',
@@ -20,7 +21,7 @@ function adapt(source, binding, accepted = fingerprints) {
     const target = methods.find(item => item.key.name === 'initializeWindowsUpdater');
     if (!target) return;
     if (!['setUpdateReady', 'setUpdateLifecycleState', 'checkForUpdates', 'installUpdatesIfAvailable', 'getIsUpdateReady']
-      .every(name => names.has(name)) || !accepted.has(shape(target).fingerprint)) throw unsupported();
+      .every(name => names.has(name)) || (!accepted.has(shape(target).fingerprint) && !supportsContract(node))) throw unsupported();
     matches.push(target.value.body);
   } });
   if (!matches.length) return null;
