@@ -1,5 +1,13 @@
 # Tested builds
 
+## 2026-09-20: Windows compact model colors
+
+Windows patch revision **7** on app **26.911.61220 (9647)** applies the independent structural color adapter while retaining the native compact layout. In a disposable copy, both dark and light themes displayed **GPT-6 Astra** with a solid Fast glyph using the native primary text color. Ultra used the native purple in both Fast and Standard; Standard hid the glyph. Dark-theme text/icon and Ultra colors were `rgb(223, 223, 223)` and `rgb(173, 123, 249)`; light-theme values were `rgb(26, 28, 31)` and `rgb(146, 79, 247)`. These are observed theme values, not hardcoded patch colors.
+
+Each theme completed Fast and Standard responses against a loopback provider: Fast sent `priority`, Standard omitted the tier. The first attempt failed to connect to the test-only DevTools socket before reaching the UI; a fresh full retry passed both themes. Temporary app copies and profiles were removed, and the personal app retained its PID/creation time, active generation, configuration and patched hashes; official source fingerprints were unchanged. This run checked installation and rendering, not another native update cycle or a Microsoft Store download.
+
+The local suite passed **140 tests**, with **11 platform-specific skips** and **0 failures**. Source/PowerShell syntax checks and Windows one-click packaging passed. Structural tests cover renamed identifiers, repeated adaptation, Ultra/other efforts, native cache updates, ambiguity and independent color fallback. macOS keeps its existing full-layout adapter.
+
 ## 2026-09-19: Windows model names and filled Fast glyph
 
 Windows patch revision **6** on app **26.911.61220 (9647)** retains the macOS model-name and filled-icon transformations when only the compact layout changes. Revision 5 had disabled all appearance patches after one unsupported layout; revision 6 records and skips individual incompatible features. On this build only `compact-model-control` uses native appearance. The existing model-name, Default preset and Fast-icon recipes match without new build-specific fingerprints.

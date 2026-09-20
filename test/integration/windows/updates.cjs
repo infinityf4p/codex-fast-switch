@@ -258,6 +258,7 @@ async function run(source, artifacts, previousState) {
         screenshot: path.join(artifacts, 'updated-fast-settings.png'),
         model, modelLabel: verifyModelPresentation && model === 'gpt-6-astra' ? 'GPT-6 Astra' : undefined,
         verifyModelPresentation,
+        verifyCompactColors: active.compatibility?.compactColors === true,
         verifyCompactControl: !active.compatibility?.nativeAppearance });
     }
     report.passed = true;

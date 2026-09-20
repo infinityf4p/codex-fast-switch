@@ -80,11 +80,28 @@ test('a changed Windows layout retains the matching model names, filled icon and
     return prepared;
   } });
   assert.deepEqual(calls, [['original.asar'], ['original.asar', undefined, undefined, null,
-    require('../../src/core/picker-recipe.json')]]);
+    require('../../src/core/picker-recipe.json'), true]]);
   assert.deepEqual(result.targets, prepared.targets);
   assert.deepEqual(result.checks, prepared.checks);
   assert.equal(result.compatibility.nativeAppearance, true);
   assert.deepEqual(result.compatibility.nativeAppearanceFeatures, ['compact-model-control']);
+});
+
+test('unknown compact colors fall back independently without removing model names or the filled icon', async () => {
+  let calls = 0;
+  const result = await planWindowsArchive('original.asar', { plan: async (_archive, _gates, icon, compact, picker, colors) => {
+    if (++calls <= 2) throw Object.assign(new Error('Changed appearance'), {
+      code: 'UNSUPPORTED_APPEARANCE', appearance: calls === 1 ? 'compact-model-control' : 'compact-colors',
+    });
+    assert.equal(icon, undefined);
+    assert.equal(compact, null);
+    assert.equal(colors, false);
+    assert.ok(picker.some(recipe => recipe.kind === 'model-name'));
+    return { targets: [], checks: ['required Fast checks'] };
+  } });
+  assert.deepEqual(result.compatibility.nativeAppearanceFeatures, ['compact-model-control', 'compact-colors']);
+  assert.equal(result.compatibility.compactColors, false);
+  assert.deepEqual(result.checks, ['required Fast checks']);
 });
 
 test('independent appearance failures retain unaffected transforms and cannot loop on the same failure', async () => {

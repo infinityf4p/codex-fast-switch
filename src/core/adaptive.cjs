@@ -175,7 +175,7 @@ function adaptFastIcon(source, recipe = defaultIconRecipe) {
 
 async function planArchive(archive, recipes = defaultRecipes, iconRecipe = recipes === defaultRecipes ? defaultIconRecipe : null,
   compactRecipe = recipes === defaultRecipes ? undefined : null,
-  pickerRecipes = recipes === defaultRecipes ? defaultPickerRecipes : null) {
+  pickerRecipes = recipes === defaultRecipes ? defaultPickerRecipes : null, compactColors = false) {
   const asar = require('@electron/asar');
   const { adaptCompact } = require('./compact.cjs');
   const { adaptPicker } = require('./picker.cjs');
@@ -188,6 +188,7 @@ async function planArchive(archive, recipes = defaultRecipes, iconRecipe = recip
   const detectedRequirements = new Set();
   let iconMatches = 0;
   let compactMatches = 0;
+  let colorMatches = 0;
   const pickerMatches = [];
   const appearance = (feature, action) => {
     try { return action(); }
@@ -209,6 +210,7 @@ async function planArchive(archive, recipes = defaultRecipes, iconRecipe = recip
     }
     if (!source.includes('fast_mode') && !source.includes('serviceTierForRequest') && !source.includes('readServiceTier') &&
       !((iconRecipe || compactRecipe !== null) && source.includes('serviceTierIconKind')) &&
+      !(compactColors && source.includes('data-composer-navigation-target')) &&
       !(pickerRecipes && source.includes('stripGptPrefix'))) continue;
     const result = adapt(source, scopedRecipes);
     const icon = scope === 'webview' && iconRecipe && source.includes('serviceTierIconKind')
@@ -217,15 +219,19 @@ async function planArchive(archive, recipes = defaultRecipes, iconRecipe = recip
       ? appearance('compact-model-control', () => adaptCompact(icon?.patched ?? result.patched, compactRecipe)) : null;
     const picker = scope === 'webview' && pickerRecipes && source.includes('stripGptPrefix')
       ? appearance('model-picker', () => adaptPicker(compact?.patched ?? icon?.patched ?? result.patched, pickerRecipes)) : null;
+    const colors = scope === 'webview' && compactColors && source.includes('data-composer-navigation-target')
+      ? appearance('compact-colors', () => require('./compact-colors.cjs').adaptCompactColors(
+        picker?.patched ?? compact?.patched ?? icon?.patched ?? result.patched)) : null;
     if (icon?.matched) iconMatches++;
     if (compact?.matched) compactMatches++;
+    if (colors?.matched) colorMatches++;
     pickerMatches.push(...(picker?.matches ?? []));
     const pickerChanges = picker?.matches.filter(match => match.changed).map(match => match.kind) ?? [];
-    if (!result.matches.length && !icon?.changed && !compact?.changed && !pickerChanges.length) continue;
+    if (!result.matches.length && !icon?.changed && !compact?.changed && !pickerChanges.length && !colors?.changed) continue;
     allMatches.push(...result.matches.map(match => ({ ...match, scope })));
-    targets.push({ entry, sourceSha256: sha256(bytes), patched: Buffer.from(picker?.patched ?? compact?.patched ?? icon?.patched ?? result.patched),
+    targets.push({ entry, sourceSha256: sha256(bytes), patched: Buffer.from(colors?.patched ?? picker?.patched ?? compact?.patched ?? icon?.patched ?? result.patched),
       kinds: [...result.matches.map(item => item.recipe.kind), ...(icon?.changed ? ['fast-icon'] : []),
-        ...(compact?.changed ? ['compact-model-control'] : []), ...pickerChanges] });
+        ...(compact?.changed ? ['compact-model-control'] : []), ...pickerChanges, ...(colors?.changed ? ['compact-colors'] : [])] });
   }
   const required = new Set([...recipes.filter(recipe => !recipe.optional).map(recipe => recipe.kind), ...detectedRequirements,
     ...allMatches.flatMap(match => match.recipe.requires || [])]);
@@ -238,6 +244,7 @@ async function planArchive(archive, recipes = defaultRecipes, iconRecipe = recip
   }
   if (iconRecipe && iconMatches !== 1) throw unsupportedAppearance('fast-icon', 'Cannot uniquely recognize the Fast icon. The official app will be kept unchanged.');
   if (compactRecipe !== null && compactMatches !== 1) throw unsupportedAppearance('compact-model-control', 'Cannot uniquely recognize the compact model control. The official app will be kept unchanged.');
+  if (compactColors && colorMatches !== 1) throw unsupportedAppearance('compact-colors', 'Cannot uniquely recognize the compact model colors. Native colors will be retained.');
   for (const recipe of pickerRecipes ?? []) {
     if (pickerMatches.filter(match => match.kind === recipe.kind).length !== 1) {
       throw unsupportedAppearance(recipe.kind, `Cannot uniquely recognize ${recipe.kind} logic. The official app will be kept unchanged.`);

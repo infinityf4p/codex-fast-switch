@@ -1,6 +1,6 @@
 const { planArchive } = require('../../core/adaptive.cjs');
 const pickerRecipes = require('../../core/picker-recipe.json');
-const features = ['fast-icon', 'compact-model-control', ...pickerRecipes.map(recipe => recipe.kind)];
+const features = ['fast-icon', 'compact-model-control', 'compact-colors', ...pickerRecipes.map(recipe => recipe.kind)];
 
 async function planWindowsArchive(archive, { plan = planArchive } = {}) {
   const disabled = new Set(), reasons = [];
@@ -10,6 +10,7 @@ async function planWindowsArchive(archive, { plan = planArchive } = {}) {
       const prepared = await plan(archive, ...options);
       return disabled.size ? { ...prepared, compatibility: {
         nativeAppearance: true, nativeAppearanceFeatures: [...disabled], reason: reasons.join(' '),
+        compactColors: prepared.targets.some(target => target.kinds?.includes('compact-colors')),
       } } : prepared;
     } catch (error) {
       if (error.code !== 'UNSUPPORTED_APPEARANCE') throw error;
@@ -21,7 +22,8 @@ async function planWindowsArchive(archive, { plan = planArchive } = {}) {
       // feature. Keep matching model names and glyphs when the layout changes.
       options = [undefined, disabled.has('fast-icon') ? null : undefined,
         disabled.has('compact-model-control') ? null : undefined,
-        pickerRecipes.filter(recipe => !disabled.has(recipe.kind))];
+        pickerRecipes.filter(recipe => !disabled.has(recipe.kind)),
+        disabled.has('compact-model-control') && !disabled.has('compact-colors')];
     }
   }
 }
