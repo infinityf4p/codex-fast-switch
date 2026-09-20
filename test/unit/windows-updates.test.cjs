@@ -14,6 +14,7 @@ const store = require('../../src/platforms/windows/store.cjs');
 const automatic = require('../../src/platforms/windows/automatic.cjs');
 const platform = require('../../src/platforms/windows/platform.cjs');
 const launcher = require('../../src/platforms/windows/launcher.cjs');
+const identity = require('../../src/platforms/windows/identity.cjs');
 const { main, launch } = require('../../src/platforms/windows/cli.cjs');
 
 test('native updater adaptation changes only a recognized Windows initializer', () => {
@@ -230,6 +231,7 @@ test('update installation waits for exit before publishing and reopening the new
 
 test('failed updates preserve the pointer and reopen the old copy after exit', async t => {
   const f = fixture(t), opened = [];
+  t.mock.method(launcher, 'restorePrevious', () => assert.fail('the installer already handles its rollback'));
   await assert.rejects(updates.install(f.state, f.running.id, {
     resolve: () => f.source, verify: () => {}, same: () => true, stopped: () => {},
     preflight: async () => {},
@@ -240,6 +242,86 @@ test('failed updates preserve the pointer and reopen the old copy after exit', a
   assert.deepEqual(opened, [f.running.app]);
   assert.equal(store.checkedActive(f.state).id, f.running.id);
   assert.equal(store.readOptional(updates.jobPath(f.state)).error, 'Disk full');
+});
+
+for (const advanced of [false, true]) test(`update activation failure restores and opens the previous active generation (advanced=${advanced})`, async t => {
+  const f = fixture(t), calls = [], previous = advanced ? f.makeRecord('2') : f.running;
+  const next = f.makeRecord('3'), userData = path.join(f.root, 'same profile');
+  store.saveJson(store.activePath(f.state), previous);
+  fs.writeFileSync(path.join(path.dirname(previous.app), 'AppxManifest.xml'), identity.manifest('x64'));
+  t.mock.method(identity, 'registerExisting', app => {
+    assert.equal(app, previous.app);
+    assert.deepEqual(store.checkedActive(f.state), previous);
+    calls.push('identity');
+  });
+  await assert.rejects(updates.install(f.state, f.running.id, {
+    resolve: () => f.source, verify: () => {}, same: () => true, stopped: () => {},
+    preflight: async () => {}, ready: async () => userData,
+    installCopy: async () => {
+      store.saveJson(store.activePath(f.state), next);
+      return { status: 'installed', ...next };
+    },
+    open(app, options) {
+      assert.equal(options.userData, userData);
+      if (app === next.app) { calls.push('new'); throw new Error('Activation failed'); }
+      assert.equal(app, previous.app);
+      assert.deepEqual(store.checkedActive(f.state), previous);
+      calls.push('old');
+    },
+  }), /Activation failed/);
+  assert.deepEqual(calls, ['new', 'identity', 'old']);
+  assert.equal(store.readOptional(updates.jobPath(f.state)).status, 'failed');
+});
+
+for (const reopened of ['new', 'latestSource']) test(`update activation failure does not replace a running ${reopened}`, async t => {
+  const f = fixture(t), next = f.makeRecord('2'), latestSource = path.join(f.root, 'new official');
+  let attempted = false, resolutions = 0;
+  t.mock.method(launcher, 'restorePrevious', () => assert.fail('must not change a running package identity'));
+  await assert.rejects(updates.install(f.state, f.running.id, {
+    resolve: () => ++resolutions === 1 ? f.source : latestSource,
+    verify: () => {}, same: () => true, preflight: async () => {}, ready: async () => path.join(f.root, 'profile'),
+    stopped(apps) {
+      if (!attempted) return;
+      for (const app of [f.source, latestSource, f.running.app, next.app]) assert.equal(apps.includes(app), true);
+      throw Object.assign(new Error(`${reopened} is running`), { code: 'APP_RUNNING' });
+    },
+    installCopy: async () => {
+      store.saveJson(store.activePath(f.state), next);
+      return { status: 'installed', ...next };
+    },
+    open(app) {
+      assert.equal(app, next.app);
+      assert.equal(attempted, false);
+      attempted = true;
+      throw new Error('Activation failed');
+    },
+  }), /Activation failed/);
+  assert.deepEqual(store.checkedActive(f.state), next);
+});
+
+test('update activation failure without a previous active copy clears local activation and reopens the original profile', async t => {
+  const f = fixture(t), next = f.makeRecord('2'), calls = [], userData = path.join(f.root, 'profile');
+  fs.unlinkSync(store.activePath(f.state));
+  t.mock.method(identity, 'remove', prepared => {
+    assert.equal(store.checkedActive(f.state), null);
+    assert.deepEqual(prepared.roots, [path.dirname(next.app)]);
+    calls.push('remove');
+  });
+  await assert.rejects(updates.install(f.state, f.running.id, {
+    resolve: () => f.source, verify: () => {}, same: () => true, stopped: () => {},
+    preflight: async () => {}, ready: async () => userData,
+    installCopy: async () => {
+      store.saveJson(store.activePath(f.state), next);
+      return { status: 'installed', ...next };
+    },
+    open(app, options) {
+      assert.equal(options.userData, userData);
+      if (app === next.app) { calls.push('new'); throw new Error('Activation failed'); }
+      assert.equal(app, f.source);
+      calls.push('official');
+    },
+  }), /Activation failed/);
+  assert.deepEqual(calls, ['new', 'remove', 'official']);
 });
 
 test('unsupported updates fail before signaling readiness or closing the running app', async t => {

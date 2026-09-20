@@ -63,6 +63,8 @@ async function install(state, id, { ready, installCopy = launcher.install, resol
       const save = extra => { Object.assign(job, extra, { checkedAt: new Date(now()).toISOString() }); store.saveJson(jobPath(state), job); };
       let userData;
       let exited = false;
+      let latestSource = source;
+      let activatingApp;
       try {
         save({});
         // Check compatibility while the user's app is still running. The helper
@@ -81,11 +83,13 @@ async function install(state, id, { ready, installCopy = launcher.install, resol
             { code: 'QUIT_TIMEOUT' });
           await wait(500);
         }
-        const latestSource = resolve(state);
+        latestSource = resolve(state);
         const installed = await installCopy(latestSource, state, { onPhase: phase => save({ status: 'installing', phase }) });
         if (!['installed', 'already-installed'].includes(installed.status)) throw new Error('The updated copy was not installed.');
         stopped([latestSource, running.app]);
+        activatingApp = installed.app;
         open(installed.app, { userData });
+        activatingApp = null;
         save({ status: 'installed', app: installed.app, version: installed.version, build: installed.build, error: null });
         store.saveJson(store.statusPath(state), { status: 'installed', activeId: store.checkedActive(state)?.id,
           successStamp: stamp(latestSource), checkedAt: new Date(now()).toISOString(), error: null });
@@ -95,8 +99,12 @@ async function install(state, id, { ready, installCopy = launcher.install, resol
         catch (recordError) { error.message += ' Could not record failure: ' + recordError.message; }
         if (exited) {
           try {
-            stopped([source, running.app, store.checkedActive(state)?.app]);
-            if (same(running.app, running.patched)) open(running.app, { userData });
+            stopped([source, latestSource, running.app, active?.app, activatingApp, store.checkedActive(state)?.app]);
+            const previous = activatingApp ? active : running;
+            if (!previous || same(previous.app, previous.patched)) {
+              if (activatingApp) launcher.restorePrevious(state, active, activatingApp);
+              open(previous?.app || source, { userData });
+            }
           } catch (reopenError) {
             error.message += ' Could not reopen the previous copy: ' + reopenError.message;
             try { save({ reopenError: reopenError.message }); } catch {}

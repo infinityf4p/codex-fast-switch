@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- Prepare the local package identity required by newer Windows Owl runtimes and activate the registered copy through Windows package activation.
+- Preserve official Windows package icon variants with a local PRI index. Copy theme and target-size assets before registration, refresh changed resources, retain pending refreshes after failed registration, and keep the basic official logos when a future asset layout cannot use the index. The index contains only relative image paths; installation does not require the Windows SDK.
+- Unregister owned Windows package identities before uninstall deletes their files, and remove activation entries when restoring the original app. Registration/removal failures retain the files and launch records needed for retry. Validate generation ownership, reject registration conflicts with another installation, and restore the previous registration and launch target if an update cannot finish registration, shortcut setup or activation. Activation rollback checks that the related apps have stopped before changing their identities.
+- Preserve explicit user-data directories during package activation, and initialize missing identities when opening an otherwise current stopped copy.
+
 ## 0.2.5 — 2026-09-20
 
 - Windows patch revision 7 adds an independent structural `compact-colors` transform for the collapsed model picker: Ultra uses native purple (`--color-chart-purple`), and the filled Fast icon follows the model's primary text color (`--color-text`), dark gray in light themes and light gray in dark themes. Recognized colors remain corrected when the full layout is unsupported; unknown color structures fall back independently without blocking compatible core updates.

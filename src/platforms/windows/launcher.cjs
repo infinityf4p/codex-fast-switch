@@ -4,6 +4,7 @@ const crypto = require('node:crypto');
 const { copyRuntime } = require('../../core/runtime.cjs');
 const platform = require('./platform.cjs');
 const store = require('./store.cjs');
+const identity = require('./identity.cjs');
 const prepared = new Set();
 
 function prepare(state) {
@@ -36,11 +37,39 @@ function refresh(state, app) {
   return configure(state, app, { maintenance: true });
 }
 
-async function install(source, state, options) {
+async function install(source, state, options, { register = identity.ensure, configureShortcuts = configure } = {}) {
+  const previous = store.checkedActive(state);
   const result = await store.install(source, state, options);
-  if (['installed', 'already-installed'].includes(result.status)) configure(state, result.app);
+  if (['installed', 'already-installed'].includes(result.status)) {
+    try {
+      register(result.app, result.source || source);
+      configureShortcuts(state, result.app);
+    } catch (error) {
+      try { restorePrevious(state, previous, result.app); }
+      catch (rollbackError) { error.message += ' ' + rollbackError.message; }
+      throw error;
+    }
+  }
   return result;
 }
 
+// Callers recovering from activation must first confirm that every related app
+// is stopped: the package identity can belong to only one generation at a time.
+function restorePrevious(state, previous, installedApp) {
+  const failures = [];
+  try {
+    if (previous) store.saveJson(store.activePath(state), previous);
+    else if (fs.existsSync(store.activePath(state))) fs.unlinkSync(store.activePath(state));
+  } catch (error) { failures.push(`Restoring the previous launch target failed: ${error.message}`); }
+  try {
+    if (previous && fs.existsSync(path.join(path.dirname(previous.app), 'AppxManifest.xml'))) {
+      identity.registerExisting(previous.app);
+    } else {
+      identity.remove({ state, roots: [path.dirname(installedApp)] });
+    }
+  } catch (error) { failures.push(`Restoring the previous package identity failed: ${error.message}`); }
+  if (failures.length) throw new Error(failures.join(' '));
+}
+
 const remove = state => platform.native('remove-shortcuts', { state });
-module.exports = { prepare, configure, refresh, install, remove };
+module.exports = { prepare, configure, refresh, install, restorePrevious, remove };

@@ -1,5 +1,23 @@
 # Tested builds
 
+## 2026-09-20: Windows package identity cleanup and recovery
+
+The local suite passed **184 tests**, with **11 platform-specific skips** and **0 failures**. JavaScript/JSON and PowerShell checks passed, and the Windows ZIP plus standalone install/uninstall scripts built successfully.
+
+Temporary generation directories and mocked package operations exercise the real PowerShell identity actions: exact installation/name/publisher matching, case-insensitive Windows paths, missing registrations, removal failure and residual-registration checks, redirected paths, cross-state conflicts, running-copy refusal, and restoring the old registration after a failed switch. CLI checks verify unregistration before file deletion, preserving copies and the active pointer on failure, restoring the original while retaining generations, recovering the previous pointer after registration or shortcut failure, and repairing identity on launch without repatching a current copy. A compiled activation helper test parses seven profile argument cases with `CommandLineToArgvW` and checks error propagation through an injected activation transport.
+
+Additional cases cover synchronous activation failure after a successful installation: restore the previous launch record and existing package resources before reopening, preserve the update's user-data directory, retain a running generation rather than switching its identity, and return to the official app if no previous active copy exists. A successful activation followed by a status-write error does not trigger identity rollback. These checks do not detect an app that starts successfully and crashes later.
+
+These checks did not uninstall the personal app, register a second real package, or perform another live update/activation cycle. The earlier build-9922 icon repair is recorded separately below.
+
+## 2026-09-20: Windows package identity icons on build 9922
+
+The running **26.915.31945 (9922)** copy had been registered as `CodexFast.Switch` to satisfy the newer Owl runtime's package-identity requirement. Its PNG assets were present, but `resources.pri` was missing. The taskbar showed a blue plate, while its window HICON and shortcut ICO files already used the official artwork.
+
+A generated PRI for the local package name indexes 35 official image paths and preserves their target-size and unplated theme qualifiers. Adding this index and sending a Shell cache notification changed the Shell's resolved **32px, 48px and 96px** icon images to byte-identical renders of the official package on the current dark theme. The existing taskbar button still cached its blue plate; rebuilding only that window's button through `ITaskbarList::DeleteTab` / `AddTab` cleared it. A `PrintWindow` taskbar capture confirmed the transparent official artwork, without bringing the app in front of the user's full-screen application. This moved the unpinned button to the end of the running apps. Temporary window-property diagnostics were restored to their original empty values. The running app retained its PID and creation time, active-generation record, and program-file hashes; official files were unchanged. No app restart, Explorer restart or package re-registration was performed.
+
+The installed helper was then synchronized with the corrected resource preparation, and one replacement monitor started. The local suite passed **152 tests**, with **11 platform-specific skips** and **0 failures**; source and PowerShell syntax checks passed. Twelve resource checks use temporary directories and simulated registration, including retry after failed registration and rejecting redirected refresh markers. The PRI generation was deterministic across two builds and rejected invalid identity, embedded data, absolute paths and lost theme qualifiers. This repair did not repeat a full native-update cycle or test package activation with an isolated profile.
+
 ## 2026-09-20: Windows compact model colors
 
 Windows patch revision **7** on app **26.911.61220 (9647)** applies the independent structural color adapter while retaining the native compact layout. In a disposable copy, both dark and light themes displayed **GPT-6 Astra** with a solid Fast glyph using the native primary text color. Ultra used the native purple in both Fast and Standard; Standard hid the glyph. Dark-theme text/icon and Ultra colors were `rgb(223, 223, 223)` and `rgb(173, 123, 249)`; light-theme values were `rgb(26, 28, 31)` and `rgb(146, 79, 247)`. These are observed theme values, not hardcoded patch colors.

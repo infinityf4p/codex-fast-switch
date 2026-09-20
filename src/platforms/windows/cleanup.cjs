@@ -14,12 +14,12 @@ function checkedPath(state, target) {
   return info;
 }
 
-function plan(state) {
+function plan(state, { allowInstalledRuntime = false } = {}) {
   state = path.resolve(state);
   if (state === path.parse(state).root || fs.lstatSync(state).isSymbolicLink()) {
     throw new Error('The uninstall state must be a regular installation directory.');
   }
-  if (store.contained(fs.realpathSync(state), fs.realpathSync(process.execPath))) {
+  if (!allowInstalledRuntime && store.contained(fs.realpathSync(state), fs.realpathSync(process.execPath))) {
     throw new Error('Run uninstall.cmd so cleanup uses a temporary Node runtime outside the installation.');
   }
   const targets = [...files].map(name => path.join(state, name));
@@ -33,7 +33,7 @@ function plan(state) {
     }
     if (!['automatic.lock', 'watcher'].includes(name) && !targets.includes(target)) targets.push(target);
   }
-  const apps = [];
+  const apps = [], roots = [];
   const versions = path.join(state, 'versions');
   if (fs.existsSync(versions)) {
     for (const id of fs.readdirSync(versions)) {
@@ -50,6 +50,7 @@ function plan(state) {
       if (record?.patchId !== store.PATCH_ID || record.id !== id || record.app !== app) {
         throw new Error(`Invalid installation generation record: ${journal}`);
       }
+      roots.push(directory);
       if (fs.existsSync(app)) {
         if (!checkedPath(state, app).isDirectory()) throw new Error(`Invalid local app directory: ${app}`);
         if (fs.existsSync(platform.binaryPath(app))) apps.push(app);
@@ -60,7 +61,7 @@ function plan(state) {
   if (fs.existsSync(watcher) && fs.readdirSync(watcher).some(name => name !== 'automatic.lock')) {
     throw new Error('The watcher directory contains unrecognized files; it will not be deleted.');
   }
-  return { state, realState: fs.realpathSync(state), targets, apps };
+  return { state, realState: fs.realpathSync(state), targets, apps, roots };
 }
 
 function workerRunning(state) {

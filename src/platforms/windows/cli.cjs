@@ -6,6 +6,7 @@ const store = require('./store.cjs');
 const automatic = require('./automatic.cjs');
 const cleanup = require('./cleanup.cjs');
 const launcher = require('./launcher.cjs');
+const identity = require('./identity.cjs');
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 
 async function quitAndWait(apps, { onPhase = () => {}, timeoutMs = 30000,
@@ -25,7 +26,8 @@ async function quitAndWait(apps, { onPhase = () => {}, timeoutMs = 30000,
 
 async function launch(state, source, { restart = false, onPhase = () => {}, timeoutMs = 30000,
   processes = platform.processes, quit = platform.requestQuit, open = platform.openApp, install = store.install,
-  now = Date.now, wait = delay, same = platform.same, verify = platform.verify, preflight = store.doctor } = {}) {
+  now = Date.now, wait = delay, same = platform.same, verify = platform.verify, preflight = store.doctor,
+  prepareOpen = identity.ensure } = {}) {
   const active = store.checkedActive(state);
   const apps = [source, active?.app];
   if (!restart) {
@@ -36,16 +38,27 @@ async function launch(state, source, { restart = false, onPhase = () => {}, time
     if (!processes([active.app]).length) {
       const current = active.revision === store.PATCH_REVISION && active.source === source && same(source, active.original);
       if (!current) {
+        let activatingApp;
         try {
           const updated = await install(source, state, { onPhase });
           if (!['installed', 'already-installed'].includes(updated.status)) throw new Error('The updated copy was not installed.');
+          activatingApp = updated.app;
           open(updated.app);
+          activatingApp = null;
           return { ...updated, reopened: true };
         } catch (error) {
-          if (same(active.app, active.patched) && !processes([active.app, source]).length) open(active.app);
+          try {
+            if (same(active.app, active.patched) && !processes([active.app, source, activatingApp]).length) {
+              if (activatingApp) launcher.restorePrevious(state, active, activatingApp);
+              open(active.app);
+            }
+          } catch (openError) { error.message += ` Reopen failed: ${openError.message}`; }
           throw error;
         }
       }
+      // A current patch revision can predate local identity support or have an
+      // interrupted registration. Repair it before opening a stopped copy.
+      prepareOpen(active.app, source);
     }
     open(active.app);
     return { status: 'opened', app: active.app };
@@ -54,18 +67,25 @@ async function launch(state, source, { restart = false, onPhase = () => {}, time
   await preflight(source);
   const running = await quitAndWait(apps, { onPhase, timeoutMs, processes, quit, now, wait });
   const previousApp = running.some(item => item.path.toLowerCase() === platform.binaryPath(active?.app || source).toLowerCase()) && active ? active.app : source;
+  let activatingApp;
   try {
     const result = await install(source, state, { onPhase });
     if (!['installed', 'already-installed'].includes(result.status)) throw new Error(`Patch was not installed: ${result.status}`);
     if (processes(apps).length) return { ...result, reopened: false, restartRequired: true,
       message: 'The patch is installed. Quit the reopened Codex app, then open Codex Fast to use the updated copy.' };
     onPhase('reopening');
+    activatingApp = result.app;
     open(result.app);
+    activatingApp = null;
     return { ...result, reopened: true };
   } catch (error) {
-    if (running.length) {
+    if (activatingApp || running.length) {
       try {
-        if (!processes(apps).length && (previousApp === source || same(active.app, active.patched))) open(previousApp);
+        const reopenApp = activatingApp ? active?.app || source : previousApp;
+        if (!processes([...apps, activatingApp]).length && (reopenApp === source || same(active.app, active.patched))) {
+          if (activatingApp) launcher.restorePrevious(state, active, activatingApp);
+          open(reopenApp);
+        }
       } catch (openError) { error.message += ` Reopen failed: ${openError.message}`; }
     }
     throw error;
@@ -77,6 +97,9 @@ async function uninstall(state, { onPhase = () => {} } = {}) {
   if (prepared.apps.length) await quitAndWait(prepared.apps, { onPhase });
   onPhase('disabling-monitor');
   automatic.disable(state);
+  onPhase('unregistering-local-package');
+  platform.assertStopped(prepared.apps);
+  identity.remove(prepared);
   launcher.remove(state);
   onPhase('restoring-original');
   const result = { status: 'uninstalled', originalUnchanged: true, reopened: false,
@@ -99,6 +122,19 @@ async function uninstall(state, { onPhase = () => {} } = {}) {
   return result;
 }
 
+function restore(state) {
+  // Validate ownership and running copies before changing registration or the
+  // launch pointer. Restore may run from the retained installed Node runtime.
+  const prepared = cleanup.plan(state, { allowInstalledRuntime: true });
+  store.checkedActive(state);
+  platform.assertStopped(prepared.apps);
+  automatic.disable(state);
+  identity.remove(prepared);
+  const result = store.restore(state);
+  launcher.remove(state);
+  return result;
+}
+
 async function main(args = process.argv.slice(2)) {
   const { values, positionals } = parseArgs({ args, allowPositionals: true, options: {
     app: { type: 'string' }, state: { type: 'string' }, model: { type: 'string' }, help: { type: 'boolean', short: 'h' },
@@ -117,12 +153,7 @@ async function main(args = process.argv.slice(2)) {
   if (command === 'watch') return automatic.watch(state);
   if (command === 'tick') return automatic.tick(state);
   if (command === 'disable') return store.withLock(state, () => automatic.disable(state));
-  if (command === 'restore') return store.withLock(state, () => {
-    automatic.disable(state);
-    const result = store.restore(state);
-    launcher.remove(state);
-    return result;
-  });
+  if (command === 'restore') return store.withLock(state, () => restore(state));
   const source = command === 'uninstall' ? null : store.resolveSource(state, values.app);
   if (command === 'doctor') return store.doctor(source);
   let lastPhase = 'starting';
@@ -175,4 +206,4 @@ if (require.main === module) main().then(result => {
   if (result) console.log(JSON.stringify(result, null, 2));
   if (result?.status === 'busy') process.exitCode = 1;
 }).catch(error => { console.error(error.message); process.exitCode = 1; });
-module.exports = { main, launch, uninstall };
+module.exports = { main, launch, uninstall, restore };
