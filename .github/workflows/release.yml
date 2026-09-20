@@ -1,0 +1,117 @@
+name: Release
+on:
+  push:
+    tags:
+      - 'v*'
+permissions:
+  contents: read
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  package:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+          cache: npm
+      - name: Check release version
+        run: node -e "const assert=require('node:assert/strict');const v=require('./package.json').version;assert.match(v,/^\d+\.\d+\.\d+$/);assert.equal(process.env.GITHUB_REF_NAME,'v'+v);assert.equal(require('./package-lock.json').version,v)"
+      - run: npm ci --ignore-scripts
+      - run: npm run check
+      - run: npm run package
+      - run: npm test
+      - if: runner.os == 'macOS'
+        run: npm run test:signing
+      - name: Verify macOS package and standalone scripts
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          set -euo pipefail
+          for binary in native-helper signing-helper codex-fast-update-hook.dylib storage-access cfs-storage.dylib; do
+            lipo -verify_arch arm64 x86_64 "build/macos/$binary"
+          done
+          cp install.sh uninstall.sh dist/
+          sh dist/install.sh --help
+          sh dist/uninstall.sh --help
+          version=$(node -p 'require("./package.json").version')
+          unzip -q "dist/codex-fast-switch-$version-macos-universal.zip" -d "$RUNNER_TEMP/fast-package-smoke"
+          node "$RUNNER_TEMP/fast-package-smoke/codex-fast-switch-$version-macos-universal/cli.cjs" --help
+      - name: Verify Windows standalone scripts
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          & ./dist/install.cmd --help
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          & ./dist/uninstall.cmd --help
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: release-${{ runner.os }}
+          if-no-files-found: error
+          retention-days: 7
+          path: |
+            dist/*.zip
+            dist/*.cmd
+            dist/*.sh
+            dist/SHA256SUMS*.txt
+  publish:
+    needs: package
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          pattern: release-*
+          path: release-assets
+          merge-multiple: true
+      - name: Verify complete release assets
+        shell: bash
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          version=${RELEASE_TAG#v}
+          for asset in "codex-fast-switch-$version-macos-universal.zip" "codex-fast-switch-$version-windows.zip" install.sh uninstall.sh install.cmd uninstall.cmd SHA256SUMS.txt SHA256SUMS-windows.txt; do
+            test -s "release-assets/$asset"
+          done
+          test "$(find release-assets -maxdepth 1 -type f | wc -l)" -eq 8
+          test -s "docs/releases/$RELEASE_TAG.md"
+          (cd release-assets && sha256sum --check SHA256SUMS.txt && sha256sum --check SHA256SUMS-windows.txt)
+      - name: Publish complete release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          if gh release view "$RELEASE_TAG" --json isDraft > "$RUNNER_TEMP/fast-release.json"; then
+            test "$(jq -r .isDraft "$RUNNER_TEMP/fast-release.json")" = true
+          else
+            gh release create "$RELEASE_TAG" --verify-tag --draft --title "Codex Fast Switch $RELEASE_TAG" --notes-file "docs/releases/$RELEASE_TAG.md"
+          fi
+          gh release upload "$RELEASE_TAG" release-assets/* --clobber
+          test "$(gh release view "$RELEASE_TAG" --json assets --jq '.assets | length')" -eq 8
+          gh api "repos/$GH_REPO/releases/tags/$RELEASE_TAG" > "$RUNNER_TEMP/fast-release-assets.json"
+          python3 - "$RUNNER_TEMP/fast-release-assets.json" <<'PY'
+          import hashlib, json, pathlib, sys
+          release = json.loads(pathlib.Path(sys.argv[1]).read_text())
+          files = {file.name: file for file in pathlib.Path('release-assets').iterdir() if file.is_file()}
+          assert {asset['name'] for asset in release['assets']} == set(files)
+          for asset in release['assets']:
+              digest = hashlib.sha256(files[asset['name']].read_bytes()).hexdigest()
+              assert asset.get('digest') == 'sha256:' + digest, asset['name']
+          print('All uploaded release digests match the verified packages.')
+          PY
+          gh release edit "$RELEASE_TAG" --draft=false --latest --notes-file "docs/releases/$RELEASE_TAG.md"

@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.2.5 — 2026-09-20
 
 - Windows patch revision 7 adds an independent structural `compact-colors` transform for the collapsed model picker: Ultra uses native purple (`--color-chart-purple`), and the filled Fast icon follows the model's primary text color (`--color-text`), dark gray in light themes and light gray in dark themes. Recognized colors remain corrected when the full layout is unsupported; unknown color structures fall back independently without blocking compatible core updates.
 - Windows patch revision 6 preserves the macOS model-name and filled Fast-icon transforms when only the compact layout is unrecognized. Appearance features now fall back independently, keeping full labels such as GPT-6 Astra and the solid glyph on build 9647 without blocking compatible updates.
