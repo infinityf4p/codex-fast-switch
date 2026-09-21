@@ -12,6 +12,10 @@ function oneClickScript(archive, packageName, command = 'setup') {
     .replaceAll('__CODEX_FAST_PACKAGE__', packageName)
     .replace('__CODEX_FAST_COMMAND__', command)
     .replace('__CODEX_FAST_PAYLOAD__', payload);
+  return wrapPowerShell(script);
+}
+
+function wrapPowerShell(script) {
   const bootstrap = [
     '@echo off',
     'setlocal DisableDelayedExpansion',
@@ -35,4 +39,4 @@ function oneClickScript(archive, packageName, command = 'setup') {
   return bootstrap.join('\n').replace(/\r?\n/g, '\r\n');
 }
 
-module.exports = { oneClickScript };
+module.exports = { oneClickScript, wrapPowerShell };

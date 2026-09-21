@@ -14,6 +14,7 @@ function check(directory) {
   }
 }
 check(root);
+require('./bootstrap.cjs').generate({ check: true });
 if (process.platform === 'win32') {
   const powershell = path.join(process.env.SystemRoot || 'C:\\Windows', 'System32/WindowsPowerShell/v1.0/powershell.exe');
   execFileSync(powershell, ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File',

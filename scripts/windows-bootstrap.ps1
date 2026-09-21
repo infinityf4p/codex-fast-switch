@@ -1,24 +1,7 @@
-@echo off
-setlocal DisableDelayedExpansion
-set "CODEX_FAST_SETUP_SELF=%~f0"
-set "CODEX_FAST_SETUP_HELP=0"
-if not "%~2"=="" goto usage
-if "%~1"=="" goto run
-if /i "%~1"=="--help" goto help
-if /i "%~1"=="/?" goto help
-:usage
-echo Usage: "%~nx0" [--help]
-exit /b 2
-:help
-set "CODEX_FAST_SETUP_HELP=1"
-:run
-powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -Command "$ErrorActionPreference='Stop'; try { $raw=[IO.File]::ReadAllText($env:CODEX_FAST_SETUP_SELF); $marker=[regex]::Match($raw,'(?m)^# CODEX_FAST_SETUP_SCRIPT\r?$'); if (-not $marker.Success) { throw 'Installer script is incomplete.' }; & ([scriptblock]::Create($raw.Substring($marker.Index+$marker.Length))) } catch { Write-Host $_.Exception.Message; [void](Read-Host 'Press Enter to close'); exit 1 }"
-exit /b %errorlevel%
-# CODEX_FAST_SETUP_SCRIPT
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
 $env:PSModulePath = (Join-Path $PSHOME 'Modules') + ';' + (Join-Path $env:ProgramFiles 'WindowsPowerShell\Modules')
-$fastCommand = 'setup'
+$fastCommand = '__CODEX_FAST_COMMAND__'
 $fastBase = 'https://infinityf4p.github.io/codex-fast-switch/'
 $fastScratch = $null
 $fastSetupExit = 1

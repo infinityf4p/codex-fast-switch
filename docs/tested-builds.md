@@ -1,5 +1,11 @@
 # Tested builds
 
+## 2026-09-21: installation from tested main builds
+
+The local suite passed **193 tests**, with **11 platform-specific skips** and **0 failures**. Source, PowerShell and generated-bootstrap checks passed; workflow YAML parsed; the Windows ZIP and fixed standalone scripts packaged successfully.
+
+Installer checks exercise both macOS's embedded Node script and Windows's real PowerShell download/extraction path with simulated network responses. They cover selecting a commit without a version bump, forwarding setup/uninstall, archive SHA-256 verification, rejecting unexpected URLs and traversal paths, checking the embedded build commit, retrying when a deployment changes between metadata and archive requests, and offline bootstrap help. The download-site builder refuses incomplete platform pairs or mismatched embedded commits before creating a publishable manifest. These tests do not reinstall the personal app.
+
 ## 2026-09-20: Windows package identity cleanup and recovery
 
 The local suite passed **184 tests**, with **11 platform-specific skips** and **0 failures**. JavaScript/JSON and PowerShell checks passed, and the Windows ZIP plus standalone install/uninstall scripts built successfully.

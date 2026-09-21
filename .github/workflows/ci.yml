@@ -31,3 +31,60 @@ jobs:
         run: npm run build
       - if: runner.os == 'Windows'
         run: npm run package:windows
+      - name: Package latest macOS build
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request' && runner.os == 'macOS' && matrix.node == 22
+        run: npm run package
+      - name: Upload latest build
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request' && runner.os != 'Linux' && matrix.node == 22
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: latest-${{ runner.os }}
+          path: dist/*.zip
+          if-no-files-found: error
+          retention-days: 7
+  downloads:
+    needs: core
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    concurrency:
+      group: latest-downloads
+      cancel-in-progress: false
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Skip a build superseded on main
+        id: current
+        shell: bash
+        run: |
+          set -euo pipefail
+          head=$(git ls-remote origin refs/heads/main | cut -f1)
+          if [ "$head" = "$GITHUB_SHA" ]; then
+            echo "publish=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+            echo "A newer main commit exists; keeping the last successful download."
+          fi
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        if: steps.current.outputs.publish == 'true'
+        with:
+          pattern: latest-*
+          path: downloaded-packages
+          merge-multiple: true
+      - name: Prepare verified downloads
+        if: steps.current.outputs.publish == 'true'
+        run: node scripts/latest-site.cjs downloaded-packages downloads-site
+      - uses: actions/upload-pages-artifact@7b1f4a764d45c48632c6b24a0339c27f5614fb0b # v4
+        if: steps.current.outputs.publish == 'true'
+        with:
+          path: downloads-site
+      - name: Publish latest tested build
+        id: deployment
+        if: steps.current.outputs.publish == 'true'
+        uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e # v4

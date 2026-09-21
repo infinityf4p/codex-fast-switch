@@ -22,12 +22,16 @@
 
 先安装官方 Codex 桌面端。以下命令用于安装或升级，会自动应用补丁、开启更新监控，并在需要时正常退出和重开 App。
 
+一键入口跟随 `main` 的最新通过 CI 的构建，不需要发布 Release。每次运行 `install` 都会在线检查最新提交、校验下载包并安装；相同版本会检查和修复现有安装。推送后等待 CI 构建和发布完成即可，检查失败时继续提供上一份通过的构建。只有运行脚本时才检查 Fast Switch 工具更新。
+
+以前从 Release 下载的 `install.cmd` 内嵌固定版本，需要从下面的链接重新下载一次。新脚本保存后可反复使用，每次都会检查最新版；Release ZIP 仍可用于安装固定版本。
+
 ### macOS
 
 在终端执行：
 
 ```sh
-curl -fsSL https://github.com/infinityf4p/codex-fast-switch/releases/latest/download/install.sh | /bin/sh
+curl -fsSL https://infinityf4p.github.io/codex-fast-switch/install.sh | /bin/sh
 ```
 
 安装后继续从原来的 App 图标启动。首次切换到本地签名时，若出现 `Codex Storage Key` 钥匙串提示，请选择“始终允许”；后续补丁复用同一张本机证书。[签名说明](docs/local-signing.md)
@@ -37,10 +41,10 @@ curl -fsSL https://github.com/infinityf4p/codex-fast-switch/releases/latest/down
 在 PowerShell 执行：
 
 ```powershell
-& { $fastInstaller = Join-Path $env:TEMP 'codex-fast-install.cmd'; Invoke-WebRequest 'https://github.com/infinityf4p/codex-fast-switch/releases/latest/download/install.cmd' -OutFile $fastInstaller -UseBasicParsing -ErrorAction Stop; & $fastInstaller }
+& { $fastInstaller = Join-Path $env:TEMP 'codex-fast-install.cmd'; Invoke-WebRequest 'https://infinityf4p.github.io/codex-fast-switch/install.cmd' -OutFile $fastInstaller -UseBasicParsing -ErrorAction Stop; & $fastInstaller }
 ```
 
-也可以直接下载并双击 [install.cmd](https://github.com/infinityf4p/codex-fast-switch/releases/latest/download/install.cmd)，无需手动解压或安装 npm 依赖。
+也可以直接下载并双击 [install.cmd](https://infinityf4p.github.io/codex-fast-switch/install.cmd)，无需手动解压或安装 npm 依赖。
 
 Windows 的补丁副本位于 `%LOCALAPPDATA%\Codex Fast Switch\versions\<id>\app`。安装后使用固定的 **Codex Fast** 开始菜单入口或 ZIP 包中的 `Open Codex Fast.cmd`；启动器读取当前版本记录，启动前检查是否需要同步本机官方新版。
 
@@ -102,7 +106,7 @@ npm run package
 先用 **Command-Q** 完全退出 Codex，再在终端执行：
 
 ```sh
-curl -fsSL https://github.com/infinityf4p/codex-fast-switch/releases/latest/download/uninstall.sh | /bin/sh
+curl -fsSL https://infinityf4p.github.io/codex-fast-switch/uninstall.sh | /bin/sh
 ```
 
 脚本调用已安装的恢复程序，停用自动监控并恢复原 App，随后可从原图标打开。保留 Codex 的个人配置、会话，以及补丁的恢复记录和本地签名证书，便于恢复或以后重装时复用签名。不要在恢复成功前删除备份。
@@ -111,10 +115,10 @@ ZIP 安装也可运行 `Restore Original App.command`；源码安装可执行 `n
 
 ### Windows
 
-在 PowerShell 执行，或直接下载并双击 [uninstall.cmd](https://github.com/infinityf4p/codex-fast-switch/releases/latest/download/uninstall.cmd)：
+在 PowerShell 执行，或直接下载并双击 [uninstall.cmd](https://infinityf4p.github.io/codex-fast-switch/uninstall.cmd)：
 
 ```powershell
-& { $fastUninstaller = Join-Path $env:TEMP 'codex-fast-uninstall.cmd'; Invoke-WebRequest 'https://github.com/infinityf4p/codex-fast-switch/releases/latest/download/uninstall.cmd' -OutFile $fastUninstaller -UseBasicParsing -ErrorAction Stop; & $fastUninstaller }
+& { $fastUninstaller = Join-Path $env:TEMP 'codex-fast-uninstall.cmd'; Invoke-WebRequest 'https://infinityf4p.github.io/codex-fast-switch/uninstall.cmd' -OutFile $fastUninstaller -UseBasicParsing -ErrorAction Stop; & $fastUninstaller }
 ```
 
 正常退出补丁副本，还原本工具改动的原版快捷方式，移除监控和补丁安装文件，保留 Codex 的个人配置和会话。源码安装也可执行 `node cli.cjs uninstall`。

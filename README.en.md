@@ -22,12 +22,16 @@ Native Speed settings, expanded model and reasoning controls, and the collapsed 
 
 Install the official Codex desktop app first. These commands install or update the patch, enable update monitoring, and normally quit and reopen the app when needed.
 
+The one-click endpoints follow the latest successful CI build of `main`; no Release is required. Every run of `install` checks the latest commit, verifies the download and installs it, or checks and repairs an already-current installation. A push becomes available after CI builds and publishes it. Failed builds leave the last successful download available. Fast Switch tool updates are checked only when the script runs.
+
+Older `install.cmd` files downloaded from Releases embed a fixed version. Download the new script below once; saved copies of the new script check for updates on every run. Release ZIPs remain available for installing a fixed version.
+
 ### macOS
 
 Run in Terminal:
 
 ```sh
-curl -fsSL https://github.com/infinityf4p/codex-fast-switch/releases/latest/download/install.sh | /bin/sh
+curl -fsSL https://infinityf4p.github.io/codex-fast-switch/install.sh | /bin/sh
 ```
 
 Keep opening the usual app icon. On the first switch to local signing, choose **Always Allow** if macOS asks for `Codex Storage Key` access. Later patches reuse the same local certificate. [Signing details](docs/local-signing.md)
@@ -37,10 +41,10 @@ Keep opening the usual app icon. On the first switch to local signing, choose **
 Run in PowerShell:
 
 ```powershell
-& { $fastInstaller = Join-Path $env:TEMP 'codex-fast-install.cmd'; Invoke-WebRequest 'https://github.com/infinityf4p/codex-fast-switch/releases/latest/download/install.cmd' -OutFile $fastInstaller -UseBasicParsing -ErrorAction Stop; & $fastInstaller }
+& { $fastInstaller = Join-Path $env:TEMP 'codex-fast-install.cmd'; Invoke-WebRequest 'https://infinityf4p.github.io/codex-fast-switch/install.cmd' -OutFile $fastInstaller -UseBasicParsing -ErrorAction Stop; & $fastInstaller }
 ```
 
-Or download and double-click [install.cmd](https://github.com/infinityf4p/codex-fast-switch/releases/latest/download/install.cmd). No manual extraction or npm dependency installation is required.
+Or download and double-click [install.cmd](https://infinityf4p.github.io/codex-fast-switch/install.cmd). No manual extraction or npm dependency installation is required.
 
 Windows keeps patched copies in `%LOCALAPPDATA%\Codex Fast Switch\versions\<id>\app`. Use the stable **Codex Fast** Start menu shortcut or `Open Codex Fast.cmd` from the ZIP; the launcher reads the active generation and checks for a newer installed official version before opening a stopped copy.
 
@@ -102,7 +106,7 @@ npm run package
 Fully quit Codex with **Command-Q**, then run in Terminal:
 
 ```sh
-curl -fsSL https://github.com/infinityf4p/codex-fast-switch/releases/latest/download/uninstall.sh | /bin/sh
+curl -fsSL https://infinityf4p.github.io/codex-fast-switch/uninstall.sh | /bin/sh
 ```
 
 The script uses the installed recovery program to stop monitoring and restore the original app. Reopen it using the usual icon. Codex's personal settings and conversations are kept, along with patch recovery records and the local signing identity for recovery or later reinstallation. Keep the backup until restoration succeeds.
@@ -111,10 +115,10 @@ ZIP users can also run `Restore Original App.command`; source users can run `nod
 
 ### Windows
 
-Run in PowerShell, or download and double-click [uninstall.cmd](https://github.com/infinityf4p/codex-fast-switch/releases/latest/download/uninstall.cmd):
+Run in PowerShell, or download and double-click [uninstall.cmd](https://infinityf4p.github.io/codex-fast-switch/uninstall.cmd):
 
 ```powershell
-& { $fastUninstaller = Join-Path $env:TEMP 'codex-fast-uninstall.cmd'; Invoke-WebRequest 'https://github.com/infinityf4p/codex-fast-switch/releases/latest/download/uninstall.cmd' -OutFile $fastUninstaller -UseBasicParsing -ErrorAction Stop; & $fastUninstaller }
+& { $fastUninstaller = Join-Path $env:TEMP 'codex-fast-uninstall.cmd'; Invoke-WebRequest 'https://infinityf4p.github.io/codex-fast-switch/uninstall.cmd' -OutFile $fastUninstaller -UseBasicParsing -ErrorAction Stop; & $fastUninstaller }
 ```
 
 This normally quits the patched copy, restores original shortcuts changed by this tool, and removes monitoring and patch installation files, keeping Codex's personal settings and conversations. Source users can also run `node cli.cjs uninstall`.

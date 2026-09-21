@@ -41,35 +41,62 @@ const path = require('node:path');
 const crypto = require('node:crypto');
 const { execFileSync } = require('node:child_process');
 const [temporary, ...options] = process.argv.slice(2);
-const repository = 'infinityf4p/codex-fast-switch';
+const base = 'https://infinityf4p.github.io/codex-fast-switch/';
 
 function download(url, destination) {
   execFileSync('/usr/bin/curl', ['--fail', '--silent', '--show-error', '--location',
     '--proto', '=https', '--proto-redir', '=https', '--connect-timeout', '15', '--max-time', '180',
-    '--retry', '2', '--output', destination, url], { stdio: 'inherit' });
+    '--retry', '2', '--header', 'Cache-Control: no-cache', '--output', destination, url], { stdio: 'inherit' });
 }
 try {
-  console.log('Finding the latest Codex Fast Switch release...');
-  const metadata = path.join(temporary, 'release.json');
-  download(`https://api.github.com/repos/${repository}/releases/latest`, metadata);
-  const release = JSON.parse(fs.readFileSync(metadata, 'utf8'));
-  const assets = release.assets?.filter(asset => /^codex-fast-switch-\d+\.\d+\.\d+-macos-universal\.zip$/.test(asset.name));
-  if (release.draft || release.prerelease || assets?.length !== 1) throw new Error('A stable macOS release package was not found.');
-  const asset = assets[0];
-  const url = new URL(asset.browser_download_url);
-  if (url.protocol !== 'https:' || url.hostname !== 'github.com' || !url.pathname.startsWith(`/${repository}/releases/download/`)) {
-    throw new Error('The release has an unexpected download URL.');
+  const metadata = path.join(temporary, 'latest.json');
+  const archive = path.join(temporary, 'package.zip');
+  let latest, asset;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      console.log('Checking the latest tested Codex Fast Switch build...');
+      download(base + 'latest.json?check=' + crypto.randomUUID(), metadata);
+      latest = JSON.parse(fs.readFileSync(metadata, 'utf8'));
+      if (latest.schemaVersion !== 1 || !/^[a-f0-9]{40}$/.test(latest.commit) || !/^\d+\.\d+\.\d+$/.test(latest.version)) {
+        throw new Error('Invalid update metadata.');
+      }
+      asset = latest.assets?.darwin;
+      const directory = `codex-fast-switch-${latest.version}-macos-universal`;
+      if (asset?.url !== `${base}${latest.commit}/${directory}.zip` || asset.directory !== directory ||
+          !/^[a-f0-9]{64}$/.test(asset.sha256) || !Number.isSafeInteger(asset.size) || asset.size <= 0 || asset.size > 134217728) {
+        throw new Error('The update has an unexpected download URL or checksum.');
+      }
+      console.log(`Latest build: ${latest.commit.slice(0, 12)}`);
+      const stateIndex = options.indexOf('--state');
+      const state = stateIndex >= 0 ? options[stateIndex + 1] : path.join(require('node:os').homedir(), 'Library/Application Support/Codex Fast Switch');
+      try {
+        const installed = JSON.parse(fs.readFileSync(path.join(state, 'agent/build-info.json'), 'utf8'));
+        if (installed.commit === latest.commit) console.log('This build is already installed. Checking and repairing the installation...');
+        else if (/^[a-f0-9]{40}$/.test(installed.commit)) console.log(`Updating from: ${installed.commit.slice(0, 12)}`);
+      } catch {}
+      download(asset.url, archive);
+      const bytes = fs.readFileSync(archive);
+      if (bytes.length !== asset.size || crypto.createHash('sha256').update(bytes).digest('hex') !== asset.sha256) {
+        throw new Error('The downloaded package failed its SHA-256 check.');
+      }
+      break;
+    } catch (error) {
+      if (attempt === 1) throw error;
+      console.log('Retrying with fresh update metadata...');
+    }
   }
-  if (!/^sha256:[a-f0-9]{64}$/.test(asset.digest)) throw new Error('The release is missing its SHA-256 digest.');
-  const archive = path.join(temporary, asset.name);
-  console.log(`Downloading ${release.tag_name}...`);
-  download(url.href, archive);
-  const digest = crypto.createHash('sha256').update(fs.readFileSync(archive)).digest('hex');
-  if (digest !== asset.digest.slice(7)) throw new Error('The downloaded package failed its SHA-256 check.');
+  const entries = execFileSync('/usr/bin/unzip', ['-Z', '-1', archive], { encoding: 'utf8' }).trim().split('\n');
+  if (entries.some(entry => entry !== asset.directory + '/' &&
+      (!entry.startsWith(asset.directory + '/') || entry.split('/').some(part => part === '..' || part === '.') || entry.includes('\\')))) {
+    throw new Error('The downloaded package contains an unexpected path.');
+  }
   const unpacked = path.join(temporary, 'unpacked');
   fs.mkdirSync(unpacked);
   execFileSync('/usr/bin/ditto', ['-x', '-k', archive, unpacked], { stdio: 'inherit' });
-  const directory = path.join(unpacked, asset.name.slice(0, -4));
+  const directory = path.join(unpacked, asset.directory);
+  if (JSON.parse(fs.readFileSync(path.join(directory, 'build-info.json'), 'utf8')).commit !== latest.commit) {
+    throw new Error('The downloaded package belongs to a different build.');
+  }
   execFileSync(process.execPath, [path.join(directory, 'cli.cjs'), 'setup', ...options], { stdio: 'inherit' });
   console.log('Codex Fast Switch is ready.');
 } catch (error) {

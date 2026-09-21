@@ -37,6 +37,18 @@ function stagePackage(name, platform) {
     fs.mkdirSync(path.dirname(target), { recursive: true });
     fs.cpSync(path.join(root, file), target, { recursive: true, verbatimSymlinks: true });
   }
+  const commit = /^[a-f0-9]{40}$/.test(process.env.GITHUB_SHA || '') ? process.env.GITHUB_SHA : null;
+  fs.writeFileSync(path.join(stage, 'build-info.json'), JSON.stringify({ schemaVersion: 1, commit,
+    version: require('../package.json').version }, null, 2) + '\n');
+  if (platform === 'win32') {
+    // ZIPs remain self-contained/pinned. Only the repository's small online
+    // bootstrap scripts resolve the latest tested main build on every run.
+    for (const [file, command] of [['install.cmd', 'setup'], ['uninstall.cmd', 'uninstall']]) {
+      fs.writeFileSync(path.join(stage, file), ['@echo off', 'setlocal DisableDelayedExpansion',
+        `powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0launchers\\windows\\run.ps1" ${command} %*`,
+        'exit /b %errorlevel%', ''].join('\r\n'));
+    }
+  }
   return { dist, stage };
 }
 

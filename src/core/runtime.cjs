@@ -27,6 +27,9 @@ function copyRuntime(destination, platform = process.platform) {
     fs.mkdirSync(path.dirname(target), { recursive: true });
     fs.cpSync(path.join(root, file), target, { recursive: true, verbatimSymlinks: true });
   }
+  const sourceBuild = path.join(root, 'build-info.json'), installedBuild = path.join(destination, 'build-info.json');
+  if (fs.existsSync(sourceBuild)) fs.copyFileSync(sourceBuild, installedBuild);
+  else if (fs.existsSync(installedBuild)) fs.unlinkSync(installedBuild);
 }
 
 module.exports = { root, runtimeFiles, copyRuntime };
