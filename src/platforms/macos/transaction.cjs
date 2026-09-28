@@ -32,6 +32,17 @@ function version(app) {
 function swap(left, right) {
   execFileSync(path.join(__dirname, '../../../build/macos/native-helper'), ['swap', left, right], { stdio: 'pipe' });
 }
+function clearFinderInfo(destination) {
+  try {
+    execFileSync('/usr/bin/xattr', ['-dr', 'com.apple.FinderInfo', destination], { stdio: 'pipe' });
+  } catch (error) {
+    const details = `${error.stderr || ''}\n${error.stdout || ''}\n${error.message || ''}`;
+    // Some current bundles contain read-only files without FinderInfo. macOS
+    // reports EPERM while trying to remove the absent cosmetic attribute.
+    // Keep the staged bundle; signing and the integrity checks remain strict.
+    if (!/Permission denied|Operation not permitted/.test(details)) throw error;
+  }
+}
 function marker(app) {
   if (fs.existsSync(path.join(app, 'Contents/Resources/codex-fast-local-patch.json'))) {
     throw new Error('Restore the earlier Codex Fast Patch using its original installer before using Codex Fast Switch.');
@@ -81,7 +92,7 @@ async function stage(app, destination, plan, metadata, state) {
     ...(storageHelper ? { storageHelper } : {}),
     signingCertificateSha256: identity.certificateSha256,
     archiveSha256: hashes.patchedArchiveSha256, entries: targets.map(target => ({ entry: target.entry, sha256: sha256(target.patched) })) });
-  execFileSync('/usr/bin/xattr', ['-dr', 'com.apple.FinderInfo', destination]);
+  clearFinderInfo(destination);
   signing.sign(destination, state, { entitlements: path.join(__dirname, 'local-entitlements.plist'),
     expectedCertificateSha256: identity.certificateSha256 });
   return identity.certificateSha256;
