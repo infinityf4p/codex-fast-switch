@@ -3,6 +3,12 @@
     "kind": "ui",
     "fingerprint": "d12f6631789e6512d2840425002c0e0cb62630dded683117dd75b9d69dd878c6",
     "patchedFingerprint": "4d468ee7d2f1ea619af3327bfe14b689ebfdc6768df584c67548df808dbcef55",
+    "compatibleFingerprints": [
+      {
+        "fingerprint": "271688f0115f49393ddc23bcb78988f5b8903f57d881ac96179728466b4ca2ec",
+        "patchedFingerprint": "c807b7a9ba3231e2f70b1b335f9fcbf9e04565e7ff896dd05f612a7fa6d58501"
+      }
+    ],
     "path": [
       "body",
       "body",
@@ -42,6 +48,12 @@
     "kind": "request",
     "fingerprint": "185f459739dd71a6c704ee2a5fe3c8011054763c720657903bd923ab5586cb58",
     "patchedFingerprint": "54bab9ff814a412e03cc489e248cabbe3107ce59b7851a5397ac06cd28f0ca5c",
+    "compatibleFingerprints": [
+      {
+        "fingerprint": "c27d42125ab5345d2a96c208e63bce9c62744a2505c53126c9b72d1ddf01c737",
+        "patchedFingerprint": "61ec73fc4cf26b81097b35cd4ead258fd516e110b1fc60d838fdf381f6cb5bac"
+      }
+    ],
     "path": [
       "body",
       "body",
@@ -67,6 +79,13 @@
     "kind": "models",
     "fingerprint": "848c9651159bd3fe4136f4c6afa72ea84a28873cb5d9b41256f3cf3303d2e150",
     "patchedFingerprint": "26056601a9ceb26354de70a7e36dece3a3adaf59a09ff5ae934892e17b4fe3a2",
+    "compatibleFingerprints": [
+      {
+        "fingerprint": "3e4a3bd238797717447115cfc01a88ea3b2fb4f6e30219435665e433b480e368",
+        "patchedFingerprint": "74485ca20a80d421e950fff456c3ef1c838dab34c9bb8e7d9f1f52f83b6f4d50",
+        "modelSettingsPath": ["body", "body", 0, "declarations", 1, "id", "properties", 0, "value"]
+      }
+    ],
     "path": [
       "body",
       "body",
@@ -94,6 +113,13 @@
     "scopes": ["webview", "main"],
     "fingerprint": "d6fed6d2f1a28969ab33cef77e46c6c91e0e3f0c0fbae4e7bbdbec406ebe0d84",
     "patchedFingerprint": "017af7a432d43749ceed3bcb5b441f1960fa19f359d097406a705b87d890e6da",
+    "compatibleFingerprints": [
+      {
+        "fingerprint": "2ac29f5b1f1af674d6e655060f2f168e8dcfca444bab7bf755b489b8f2feac4f",
+        "patchedFingerprint": "07053cb222cf5c15685ce10224feb9b4ff9a5f0eaa334ca0be0daac3207c948b",
+        "path": ["body", "body", 1, "argument", "properties", 0, "value", "body", "body", 1, "argument", "expressions", 1, "arguments", 3, "body", "alternate"]
+      }
+    ],
     "path": ["body", "body", 1, "argument", "properties", 0, "value", "body", "body", 1, "argument", "expressions", 1, "arguments", 3, "body", "body", 2, "argument", "right"],
     "environment": [{ "index": 6, "stub": "savedTier" }]
   }

@@ -7,7 +7,12 @@ function adaptPicker(source, recipes = defaultRecipes) {
   walk.simple(parse(source), { FunctionDeclaration(fn) {
     if (fn.end - fn.start > 5000 || !source.slice(fn.start, fn.end).includes('stripGptPrefix')) return;
     const fingerprint = shape(fn).fingerprint;
-    const recipe = recipes.find(item => [item.fingerprint, item.patchedFingerprint].includes(fingerprint));
+    let recipe;
+    for (const item of recipes) {
+      const variant = [item, ...(item.compatibleFingerprints || [])]
+        .find(candidate => [candidate.fingerprint, candidate.patchedFingerprint].includes(fingerprint));
+      if (variant) { recipe = { ...item, ...variant }; break; }
+    }
     if (recipe) matches.push({ fn, recipe, changed: fingerprint !== recipe.patchedFingerprint });
   } });
   for (const recipe of recipes) {

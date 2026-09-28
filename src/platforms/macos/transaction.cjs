@@ -14,7 +14,7 @@ const { saveJson, readJson, withLock } = require('../../core/state.cjs');
 
 const DEFAULT_STATE = path.join(os.homedir(), 'Library/Application Support/Codex Fast Switch');
 const PATCH_ID = 'codex-fast-switch-v1';
-const PATCH_REVISION = 10;
+const PATCH_REVISION = 12;
 const MARKER = 'Contents/Resources/codex-fast-switch.json';
 const archivePath = app => path.join(app, 'Contents/Resources/app.asar');
 const equal = (a, b) => JSON.stringify(a) === JSON.stringify(b);

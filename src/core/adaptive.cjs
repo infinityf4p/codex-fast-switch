@@ -55,6 +55,16 @@ function replacement(source, fn, target, kind, modelSettingsPath, modelPath = ['
     if (settings?.type !== 'Identifier' || target.type !== 'Identifier') throw new Error('Unsupported model query arguments.');
     return `{...${original},additionalAvailableModels:new Set([${[settings.name, ...modelPath].join('.')}])}`;
   }
+  if (kind === 'ui' && target.type === 'LogicalExpression' && target.operator === '||' &&
+      target.left?.type === 'BinaryExpression' && target.right?.type === 'BinaryExpression') {
+    const subject = target.left.left;
+    return `(${original}||${source.slice(subject.start, subject.end)}==="apikey")`;
+  }
+  if (kind === 'request' && target.type === 'LogicalExpression' && target.operator === '&&' &&
+      target.left?.type === 'BinaryExpression' && target.right?.type === 'BinaryExpression') {
+    const subject = target.left.left;
+    return `(${original}&&${source.slice(subject.start, subject.end)}!=="apikey")`;
+  }
   if (target.type !== 'BinaryExpression') throw new Error('Unsupported authentication check.');
   const left = source.slice(target.left.start, target.left.end);
   if (kind === 'saved-request') return `(${original}||${left}==="apiKey")`;

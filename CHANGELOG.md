@@ -8,6 +8,9 @@
 - Unregister owned Windows package identities before uninstall deletes their files, and remove activation entries when restoring the original app. Registration/removal failures retain the files and launch records needed for retry. Validate generation ownership, reject registration conflicts with another installation, and restore the previous registration and launch target if an update cannot finish registration, shortcut setup or activation. Activation rollback checks that the related apps have stopped before changing their identities.
 - Preserve explicit user-data directories during package activation, and initialize missing identities when opening an otherwise current stopped copy.
 
+- macOS patch revision 12 recognizes app 26.924.22138 (11645): adapt the updated Fast permission gates, service-tier persistence, model query and picker layout while retaining the filled native Fast glyph and fail-closed structure checks.
+- macOS patch revision 11 supports app 26.915.31029 (9771): recognize both updated compact controls and the refactored Default preset selector, preserving the native button size, tooltip state, chevron and animation keys. Keep earlier reviewed layouts and the existing fixed Storage helper.
+
 ## 0.2.5 — 2026-09-20
 
 - Windows patch revision 7 adds an independent structural `compact-colors` transform for the collapsed model picker: Ultra uses native purple (`--color-chart-purple`), and the filled Fast icon follows the model's primary text color (`--color-text`), dark gray in light themes and light gray in dark themes. Recognized colors remain corrected when the full layout is unsupported; unknown color structures fall back independently without blocking compatible core updates.

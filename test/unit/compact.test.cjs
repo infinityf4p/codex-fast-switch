@@ -97,6 +97,14 @@ test('compact adaptation is idempotent and accepts identifier and formatting cha
   assert.equal(adaptCompact(`${legacy}\n${expectedModern}`, recipe).changed, true);
 });
 
+test('single reviewed picker layout is recognized without rewriting native UI code', () => {
+  const current = `function current(input) { return Model({ model: input.model, stripGptPrefix: !0 }); }`;
+  const fingerprint = shape(parse(current).body[0]).fingerprint;
+  const reviewed = { single: { fingerprint, patchedFingerprint: fingerprint } };
+  assert.deepEqual(adaptCompact(current, reviewed), { patched: current, matched: true, changed: false });
+  assert.throws(() => adaptCompact(`${current}\n${current.replace('function current', 'function duplicate')}`, reviewed), /compact model control/);
+});
+
 test('reviewed compatibility pairs preserve a newer model fallback and remain idempotent', () => {
   const newer = legacy.replace('model: input.model,', 'model: input.model ?? input.fallbackModel,');
   const expected = expectedLegacy.replace('model: input.model,', 'model: input.model ?? input.fallbackModel,');

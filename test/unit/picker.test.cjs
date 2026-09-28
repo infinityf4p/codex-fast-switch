@@ -14,7 +14,7 @@ const models = [
   { model: 'gpt-6-astra', displayName: 'gpt-6-astra' },
 ].map(model => ({ ...model, supportedReasoningEfforts: ['low', 'medium', 'high', 'xhigh', 'ultra'].map(reasoningEffort => ({ reasoningEffort })) }));
 
-function runtime() {
+function runtime(input = source) {
   const context = vm.createContext({
     t6a: { default: (items, key) => [...new Map(items.map(item => [key(item), item])).values()] },
     r6a: [...choices('gpt-5.6-terra', ['low']), ...choices('gpt-5.6-sol', ['low', 'medium', 'high', 'xhigh'])],
@@ -27,7 +27,7 @@ function runtime() {
       return model ? [{ ...preset, powerSettingIndex, modelLabel: context.G3a(model.displayName, { stripGptPrefix: strip }) }] : [];
     }),
   });
-  vm.runInContext(adaptPicker(source).patched, context, { timeout: 1000 });
+  vm.runInContext(adaptPicker(input).patched, context, { timeout: 1000 });
   return context;
 }
 const ids = items => Array.from(items, item => item.id);
@@ -95,4 +95,31 @@ test('picker adaptation is idempotent, supports split chunks and rejects ambiguo
   const recipes = structuredClone(require('../../src/core/picker-recipe.json'));
   recipes[1].presets[0].pop();
   assert.throws(() => adaptPicker(source, recipes), /Unexpected transformed default-model-presets/);
+});
+
+test('newer preset selection preserves Default choices, account order and capability filtering', () => {
+  // The newer compiler separates preset filtering from label mapping and deduplication.
+  const newer = q3a.toString().replace('let r=(0,t6a.default)(e6a(o.filter', 'let r=o.filter')
+    .replace('}),e,i),({id:e})=>e);if(r.length>=3)return r',
+      '}),s=(0,t6a.default)(e6a(r,e,i),({id:e})=>e);if(s.length>=3)return s');
+  const input = `${G3a}\n${newer}`;
+  const patched = adaptPicker(input);
+  assert.equal(patched.matches.filter(item => item.kind === 'default-model-presets' && item.changed).length, 1);
+  const { q3a: select } = runtime(input);
+  assert.deepEqual(ids(select(models)), ['gpt-5.6-terra:low', 'gpt-5.6-sol:low', 'gpt-5.6-sol:medium',
+    'gpt-6-astra:low', 'gpt-6-astra:medium']);
+  assert.deepEqual(ids(select(models.slice(0, 2))), ['gpt-5.6-terra:low', 'gpt-5.6-sol:low', 'gpt-5.6-sol:medium']);
+  const sliderModelsConfig = { presets: [[
+    { model: 'gpt-6-astra', reasoning_effort: 'medium' },
+    { model: 'gpt-5.6-sol', reasoning_effort: 'low' },
+    { model: 'gpt-5.6-sol', reasoning_effort: 'low' },
+    { model: 'gpt-5.6-terra', reasoning_effort: 'high' },
+    { model: 'gpt-6-astra', reasoning_effort: 'ultra' },
+  ]] };
+  const before = structuredClone(sliderModelsConfig);
+  assert.deepEqual(ids(select(models, { sliderModelsConfig })),
+    ['gpt-6-astra:medium', 'gpt-5.6-sol:low', 'gpt-5.6-terra:high']);
+  assert.deepEqual(sliderModelsConfig, before);
+  assert.equal(adaptPicker(patched.patched).patched, patched.patched);
+  assert.equal(adaptPicker(newer.replaceAll('>=3', '>=4')).matches.length, 0);
 });

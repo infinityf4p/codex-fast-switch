@@ -1,7 +1,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const walk = require('acorn-walk');
-const defaultRecipes = ['compact-recipe.json', 'compact-8881-recipe.json']
+const defaultRecipes = ['compact-recipe.json', 'compact-8881-recipe.json', 'compact-9771-recipe.json', 'compact-11645-recipe.json']
   .map(file => JSON.parse(fs.readFileSync(path.join(__dirname, file), 'utf8')));
 
 function transformCompactFunction(source, fn, role, other, recipe) {
@@ -54,7 +54,21 @@ function transformCompactFunction(source, fn, role, other, recipe) {
 function adaptCompact(source, recipes = defaultRecipes) {
   const { parse, shape } = require('./adaptive.cjs');
   const supported = Array.isArray(recipes) ? recipes : [recipes];
-  const groups = supported.map(recipe => ({ recipe, legacy: [], modern: [] }));
+  const singleMatches = [];
+  for (const recipe of supported.filter(item => item.single)) {
+    walk.simple(parse(source), { FunctionDeclaration(fn) {
+      if (fn.end - fn.start > 32000 || !source.slice(fn.start, fn.end).includes('stripGptPrefix')) return;
+      const reviewed = [recipe.single, ...(recipe.single.compatibleFingerprints || [])]
+        .find(item => [item.fingerprint, item.patchedFingerprint].includes(shape(fn).fingerprint));
+      if (reviewed) singleMatches.push({ fn, recipe, reviewed });
+    } });
+  }
+  if (singleMatches.length) {
+    if (singleMatches.length !== 1) throw new Error('Cannot uniquely recognize the compact model control.');
+    const match = singleMatches[0];
+    return { patched: source, matched: true, changed: false };
+  }
+  const groups = supported.filter(recipe => !recipe.single).map(recipe => ({ recipe, legacy: [], modern: [] }));
   const roles = ['legacy', 'modern'];
   walk.simple(parse(source), { FunctionDeclaration(fn) {
     if (fn.end - fn.start > 32000 || !source.slice(fn.start, fn.end).includes('stripGptPrefix')) return;
