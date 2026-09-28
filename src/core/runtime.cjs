@@ -6,7 +6,7 @@ const common = ['cli.cjs', 'src/core', 'node_modules', 'package.json', 'package-
 const platforms = {
   darwin: [
     ...['cli.cjs', 'automatic.cjs', 'watch.cjs', 'platform.cjs', 'transaction.cjs', 'restart.cjs', 'signing.cjs',
-      'update-hook.cjs', 'relaunch.cjs', 'storage.cjs', 'local-entitlements.plist'].map(name => `src/platforms/macos/${name}`),
+      'update-hook.cjs', 'relaunch.cjs', 'storage.cjs', 'electron-integrity.cjs', 'local-entitlements.plist'].map(name => `src/platforms/macos/${name}`),
     'build/macos/native-helper', 'build/macos/signing-helper', 'build/macos/codex-fast-update-hook.dylib',
     'build/macos/storage-access', 'build/macos/cfs-storage.dylib',
   ],

@@ -172,25 +172,31 @@ function sparkleTargets(app) {
   ].filter(target => fs.existsSync(target));
 }
 
-function signNested(target, identity) {
-  execFileSync('/usr/bin/codesign', ['--force', '--sign', identity.certificateSha1, '--keychain', identity.keychain,
+function signNested(target, identity, { deep = false } = {}) {
+  execFileSync('/usr/bin/codesign', ['--force', ...(deep ? ['--deep'] : []), '--sign', identity.certificateSha1, '--keychain', identity.keychain,
     '--timestamp=none', '--preserve-metadata=identifier,entitlements,flags,runtime', target], { stdio: 'pipe' });
 }
 
-function sign(target, state, { identifier = 'com.openai.codex', entitlements, options = 'runtime', expectedCertificateSha256 } = {}) {
-  const identity = ensureIdentity(state, { expectedCertificateSha256 });
-  const requirement = requirementFor(identifier, identity.certificateSha1);
+function signFramework(target, state, { expectedCertificateSha256, identity } = {}) {
+  const signerIdentity = identity || ensureIdentity(state, { expectedCertificateSha256 });
+  signNested(target, signerIdentity, { deep: true });
+  return { certificateSha256: signerIdentity.certificateSha256 };
+}
+
+function sign(target, state, { identifier = 'com.openai.codex', entitlements, options = 'runtime', expectedCertificateSha256, identity } = {}) {
+  const signerIdentity = identity || ensureIdentity(state, { expectedCertificateSha256 });
+  const requirement = requirementFor(identifier, signerIdentity.certificateSha1);
   // Sparkle refuses to update when Autoupdate still has OpenAI's team ID and the app does not.
-  for (const nested of sparkleTargets(target)) signNested(nested, identity);
+  for (const nested of sparkleTargets(target)) signNested(nested, signerIdentity);
   const updateHook = path.join(target, 'Contents/Resources/codex-fast-update-hook.dylib');
-  if (fs.existsSync(updateHook)) signNested(updateHook, identity);
+  if (fs.existsSync(updateHook)) signNested(updateHook, signerIdentity);
   const storageBridge = path.join(target, 'Contents/Resources/cfs-storage.dylib');
-  if (fs.existsSync(storageBridge)) signNested(storageBridge, identity);
-  execFileSync('/usr/bin/codesign', ['--force', '--sign', identity.certificateSha1, '--keychain', identity.keychain,
+  if (fs.existsSync(storageBridge)) signNested(storageBridge, signerIdentity);
+  execFileSync('/usr/bin/codesign', ['--force', '--sign', signerIdentity.certificateSha1, '--keychain', signerIdentity.keychain,
     '--identifier', identifier, '--timestamp=none', '--requirements', `=designated => ${requirement}`,
     ...(options ? ['--options', options] : []), ...(entitlements ? ['--entitlements', entitlements] : []), target], { stdio: 'pipe' });
   execFileSync('/usr/bin/codesign', ['--verify', '--deep', '--strict', '-R', `=${requirement}`, target], { stdio: 'pipe' });
-  return { certificateSha256: identity.certificateSha256, requirement };
+  return { certificateSha256: signerIdentity.certificateSha256, requirement };
 }
 
-module.exports = { ensureIdentity, readIdentity, requirementFor, sparkleTargets, sign };
+module.exports = { ensureIdentity, readIdentity, requirementFor, sparkleTargets, signFramework, sign };

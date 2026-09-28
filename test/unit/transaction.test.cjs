@@ -30,6 +30,10 @@ async function fixture(t) {
   const f = { root, app, state, running: true, calls: [], plans: 0, time: 0 };
   const signing = {
     ensureIdentity: () => ({ certificateSha256: 'test-certificate' }),
+    signFramework: candidate => {
+      f.calls.push('sign-framework');
+      assert.equal(candidate.startsWith(root + path.sep), true);
+    },
     sign: candidate => {
       f.calls.push('sign');
       assert.equal(candidate.startsWith(root + path.sep), true);
@@ -47,6 +51,13 @@ async function fixture(t) {
       plan: () => ({ entry: 'package.json', sourceSha256: require('../../src/core/archive.cjs').sha256(asar.extractFile(path.join(app, 'Contents/Resources/app.asar'), 'package.json')),
         patched: asar.extractFile(path.join(app, 'Contents/Resources/app.asar'), 'package.json') }),
       copyResources: () => {},
+    },
+    './electron-integrity.cjs': {
+      disableForApp: candidate => {
+        if (!f.integrityEnabled) return { supported: false, changed: false };
+        f.calls.push('integrity');
+        return { supported: true, changed: true, framework: path.join(candidate, 'Contents/Frameworks/Codex Framework.framework') };
+      },
     },
     './signing.cjs': signing,
     './platform.cjs': {
@@ -109,6 +120,16 @@ test('real transaction prepares once before quit and retains a restorable origin
   f.running = false;
   assert.equal(f.tx.restore(f.app, f.state).status, 'restored');
   assert.deepEqual(f.tx.fingerprint(f.app), f.original);
+});
+
+test('ASAR integrity is repaired before the candidate is signed', async t => {
+  const f = await fixture(t);
+  f.integrityEnabled = true;
+  const result = await f.run();
+  assert.equal(result.status, 'installed');
+  assert.deepEqual(f.calls, ['copy', 'integrity', 'sign-framework', 'sign', 'quit', 'swap', 'open']);
+  f.running = false;
+  f.tx.restore(f.app, f.state);
 });
 
 test('signing failure discards the candidate without quitting or changing the app', async t => {

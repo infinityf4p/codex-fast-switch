@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Disable Electron's embedded ASAR integrity slot after rewriting the archive hash, then re-sign the changed framework before signing the patched app. This prevents the 0.7-second startup crash introduced by newer Electron frameworks.
 - Publish complete macOS and Windows downloads automatically after all main-branch CI checks pass. The one-click commands use a fixed download site, resolve the latest tested Git commit on each run, validate archive checksums and embedded build identities, and retry a concurrent deployment with fresh metadata. Saved online Windows scripts check for updates on every run; fixed Release ZIPs and bundled scripts remain available. No new background tool-update task is added.
 - Prepare the local package identity required by newer Windows Owl runtimes and activate the registered copy through Windows package activation.
 - Preserve official Windows package icon variants with a local PRI index. Copy theme and target-size assets before registration, refresh changed resources, retain pending refreshes after failed registration, and keep the basic official logos when a future asset layout cannot use the index. The index contains only relative image paths; installation does not require the Windows SDK.

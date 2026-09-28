@@ -10,6 +10,7 @@ const { planArchive } = require('../../core/adaptive.cjs');
 const signing = require('./signing.cjs');
 const updateHook = require('./update-hook.cjs');
 const storage = require('./storage.cjs');
+const electronIntegrity = require('./electron-integrity.cjs');
 const { saveJson, readJson, withLock } = require('../../core/state.cjs');
 
 const DEFAULT_STATE = path.join(os.homedir(), 'Library/Application Support/Codex Fast Switch');
@@ -88,13 +89,20 @@ async function stage(app, destination, plan, metadata, state) {
   const storageHelper = storage.copyBridge(destination, app, state);
   execFileSync('/usr/libexec/PlistBuddy', ['-c',
     `Set :ElectronAsarIntegrity:Resources/app.asar:hash ${hashes.headerSha256}`, path.join(destination, 'Contents/Info.plist')]);
+  // Electron 154+ embeds a digest of the ASAR integrity dictionary in its
+  // framework. Changing Info.plist without disabling that stale slot makes
+  // Electron fail closed before the app window can start.
+  const integrity = electronIntegrity.disableForApp(destination);
+  if (integrity.changed) {
+    signing.signFramework(integrity.framework, state, { identity, expectedCertificateSha256: identity.certificateSha256 });
+  }
   saveJson(path.join(destination, MARKER), { patchId: PATCH_ID, revision: PATCH_REVISION, ...metadata,
     ...(storageHelper ? { storageHelper } : {}),
     signingCertificateSha256: identity.certificateSha256,
     archiveSha256: hashes.patchedArchiveSha256, entries: targets.map(target => ({ entry: target.entry, sha256: sha256(target.patched) })) });
   clearFinderInfo(destination);
   signing.sign(destination, state, { entitlements: path.join(__dirname, 'local-entitlements.plist'),
-    expectedCertificateSha256: identity.certificateSha256 });
+    identity, expectedCertificateSha256: identity.certificateSha256 });
   return identity.certificateSha256;
 }
 
