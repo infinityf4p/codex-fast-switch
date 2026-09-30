@@ -1,6 +1,12 @@
 {
   "single": {
     "fingerprint": "7d979f5ba18df496816cb162aee1132af8b445f0e719de21c40708b4bd443bda",
-    "patchedFingerprint": "7d979f5ba18df496816cb162aee1132af8b445f0e719de21c40708b4bd443bda"
+    "patchedFingerprint": "7d979f5ba18df496816cb162aee1132af8b445f0e719de21c40708b4bd443bda",
+    "compatibleFingerprints": [
+      {
+        "fingerprint": "09513857f4baa2caf7b23d321c7b6b6e59fb0c85685773a4666dfb3ac90a36d1",
+        "patchedFingerprint": "09513857f4baa2caf7b23d321c7b6b6e59fb0c85685773a4666dfb3ac90a36d1"
+      }
+    ]
   }
 }

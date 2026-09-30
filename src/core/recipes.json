@@ -107,6 +107,14 @@
     "environment": []
   },
   {
+    "kind": "models",
+    "native": true,
+    "requiredMarker": "additionalAvailableModels",
+    "scopes": ["webview"],
+    "fingerprint": "8e79f1d8bb47b8d7c8a7db1c588ee8a13a968c0b8e529ea23fff0d302cb475a4",
+    "patchedFingerprint": "8e79f1d8bb47b8d7c8a7db1c588ee8a13a968c0b8e529ea23fff0d302cb475a4"
+  },
+  {
     "kind": "saved-request",
     "optional": true,
     "requiredMarker": "readServiceTier",

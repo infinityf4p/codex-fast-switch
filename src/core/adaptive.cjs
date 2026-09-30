@@ -80,7 +80,8 @@ function adapt(source, recipes) {
     FunctionDeclaration(fn) {
       if (fn.end - fn.start > 15000) return;
       const body = source.slice(fn.start, fn.end);
-      if (!body.includes('fast_mode') && !body.includes('serviceTierForRequest') && !body.includes('readServiceTier')) return;
+      const hasRecipeMarker = recipes.some(item => item.requiredMarker && body.includes(item.requiredMarker));
+      if (!hasRecipeMarker && !body.includes('fast_mode') && !body.includes('serviceTierForRequest') && !body.includes('readServiceTier')) return;
       const normalized = shape(fn);
       let recipe;
       for (const item of recipes) {
@@ -91,7 +92,7 @@ function adapt(source, recipes) {
       if (recipe) matches.push({ fn, recipe, names: normalized.names });
     },
   });
-  const edits = matches.map(match => {
+  const edits = matches.filter(match => !match.recipe.native).map(match => {
     const target = at(match.fn, match.recipe.path);
     return { ...match, start: target.start, end: target.end,
       value: replacement(source, match.fn, target, match.recipe.kind, match.recipe.modelSettingsPath, match.recipe.modelPath) };
@@ -101,6 +102,7 @@ function adapt(source, recipes) {
     patched = patched.slice(0, edit.start) + edit.value + patched.slice(edit.end);
   }
   for (const match of matches) {
+    if (match.recipe.native) continue;
     const original = source.slice(match.fn.start, match.fn.end);
     const edit = edits.find(item => item.fn === match.fn);
     match.patchedFunction = original.slice(0, edit.start - match.fn.start) + edit.value + original.slice(edit.end - match.fn.start);
@@ -237,10 +239,11 @@ async function planArchive(archive, recipes = defaultRecipes, iconRecipe = recip
     if (colors?.matched) colorMatches++;
     pickerMatches.push(...(picker?.matches ?? []));
     const pickerChanges = picker?.matches.filter(match => match.changed).map(match => match.kind) ?? [];
-    if (!result.matches.length && !icon?.changed && !compact?.changed && !pickerChanges.length && !colors?.changed) continue;
+    const changedMatches = result.matches.filter(match => !match.recipe.native);
+    if (!changedMatches.length && !icon?.changed && !compact?.changed && !pickerChanges.length && !colors?.changed) continue;
     allMatches.push(...result.matches.map(match => ({ ...match, scope })));
     targets.push({ entry, sourceSha256: sha256(bytes), patched: Buffer.from(colors?.patched ?? picker?.patched ?? compact?.patched ?? icon?.patched ?? result.patched),
-      kinds: [...result.matches.map(item => item.recipe.kind), ...(icon?.changed ? ['fast-icon'] : []),
+      kinds: [...changedMatches.map(item => item.recipe.kind), ...(icon?.changed ? ['fast-icon'] : []),
         ...(compact?.changed ? ['compact-model-control'] : []), ...pickerChanges, ...(colors?.changed ? ['compact-colors'] : [])] });
   }
   const required = new Set([...recipes.filter(recipe => !recipe.optional).map(recipe => recipe.kind), ...detectedRequirements,

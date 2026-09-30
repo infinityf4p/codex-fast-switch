@@ -75,6 +75,18 @@ test('model recipe variants use the selected model from nested model settings', 
   assert.equal(adaptive.adapt(source.replace('serviceTierForRequest=null', 'serviceTierForRequest="changed"'), alternatives).matches.length, 0);
 });
 
+test('native model catalogs satisfy recognition without rewriting already-compatible code', () => {
+  const source = 'function nativeCatalog(){const additionalAvailableModels=true;return additionalAvailableModels;}';
+  const fn = adaptive.parse(source).body[0];
+  const fingerprint = adaptive.shape(fn).fingerprint;
+  const recipe = { kind: 'models', native: true, requiredMarker: 'additionalAvailableModels',
+    fingerprint, patchedFingerprint: fingerprint, scopes: ['webview'] };
+  const result = adaptive.adapt(source, [recipe]);
+  assert.equal(result.matches.length, 1);
+  assert.equal(result.matches[0].recipe.native, true);
+  assert.equal(result.patched, source);
+});
+
 test('saved default speed accepts API keys while retaining other authentication and policy restrictions', async () => {
   const source = 'function saved(client,adapters){return {async readServiceTier(){if(adapters.copilot)return false;const info=await client.account();const method=await client.method();return method!=="personalAccessToken"&&info.account?.type==="chatgpt"&&client.requirements.fast_mode!==false;}}}';
   const expected = source.replace('info.account?.type==="chatgpt"', '(info.account?.type==="chatgpt"||info.account?.type==="apiKey")');

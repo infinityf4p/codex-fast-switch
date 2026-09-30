@@ -13,6 +13,11 @@
       {
         "fingerprint": "1c22f179273cb6ca77802a96709a3dd27cce704c7e83b8c4bd7272a883b6f226",
         "patchedFingerprint": "d6baac8845aab85e760787aa77d0da47aa7287ae9bff4d7971b8e83e70be2754"
+      },
+      {
+        "fingerprint": "df94c07d300a29d0c81abf9a1efb9429290a6bab74df5d6b0e25c71818f0a77e",
+        "patchedFingerprint": "88910156b78236477ce63fd63aa1044e7ff669dc7e07ded38975e7062acaa6a6",
+        "path": ["params", 1, "left", "properties", 1, "value"]
       }
     ],
     "path": ["params", 1, "left", "properties", 2, "value"],
