@@ -48,6 +48,7 @@ async function fixture(t) {
       matchesMarker: (state, app, current) => Boolean(current.storageHelper) === Boolean(f.storageEnabled),
     },
     './update-hook.cjs': {
+      adapt: source => source.replace('official', 'update-hook'),
       plan: () => ({ entry: 'package.json', sourceSha256: require('../../src/core/archive.cjs').sha256(asar.extractFile(path.join(app, 'Contents/Resources/app.asar'), 'package.json')),
         patched: asar.extractFile(path.join(app, 'Contents/Resources/app.asar'), 'package.json') }),
       copyResources: () => {},
@@ -92,7 +93,7 @@ async function fixture(t) {
   const moduleStub = { exports: {} };
   vm.runInNewContext(fs.readFileSync(filename, 'utf8'), {
     require: name => Object.hasOwn(mocks, name) ? mocks[name] : realRequire(name),
-    module: moduleStub, exports: moduleStub.exports, __dirname: path.dirname(filename), process,
+    module: moduleStub, exports: moduleStub.exports, __dirname: path.dirname(filename), process, Buffer,
   }, { filename });
   f.tx = moduleStub.exports;
   f.original = f.tx.fingerprint(app);
@@ -107,6 +108,21 @@ async function fixture(t) {
   f.assertCleanStage = () => assert.equal(fs.readdirSync(root).some(name => name.startsWith('.codex-fast-auto-')), false);
   return f;
 }
+
+test('shared ASAR targets compose the updater transform with feature transforms', async t => {
+  const f = await fixture(t);
+  const { sha256 } = require('../../src/core/archive.cjs');
+  const source = Buffer.from('official');
+  const merged = f.tx.mergeTargets([
+    { entry: 'shared.js', sourceSha256: sha256(source), patched: Buffer.from('official-feature'), kinds: ['model-name'] },
+  ], { entry: 'shared.js', sourceSha256: sha256(source), patched: Buffer.from('update-hook'), kinds: ['update-relaunch'] });
+  assert.equal(merged.length, 1);
+  assert.equal(merged[0].patched.toString(), 'update-hook-feature');
+  assert.equal(Array.from(merged[0].kinds).join(','), 'model-name,update-relaunch');
+  assert.throws(() => f.tx.mergeTargets([
+    { entry: 'shared.js', sourceSha256: sha256(source), patched: Buffer.from('official-feature') },
+  ], { entry: 'shared.js', sourceSha256: sha256(Buffer.from('changed')), patched: Buffer.from('update-hook') }), /Conflicting source hashes/);
+});
 
 test('real transaction prepares once before quit and retains a restorable original', async t => {
   const f = await fixture(t);

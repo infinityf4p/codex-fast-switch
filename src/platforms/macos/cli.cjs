@@ -49,7 +49,8 @@ async function main(args = process.argv.slice(2)) {
     if (enabled.status !== 'enabled') throw new Error(`Automatic patching was not enabled: ${enabled.status}`);
   }
   if (command === 'restart' || command === 'setup' || command === 'keychain-enable') {
-    return waitForOperation(() => automatic.restart(state, app, { model: values.model, onPhase: progress }));
+    return waitForOperation(() => automatic.restart(state, app, { model: values.model, onPhase: progress,
+      allowForceQuit: true }));
   }
   if (command === 'doctor') {
     tx.verify(app, !tx.marker(app));

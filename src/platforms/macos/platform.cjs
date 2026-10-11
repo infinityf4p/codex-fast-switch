@@ -48,6 +48,25 @@ function isRunning(app) {
   try { assertStopped(app); return false; }
   catch (error) { if (error.code === 'APP_RUNNING') return true; throw error; }
 }
+function runningPids(app) {
+  const binary = binaryPath(app);
+  const output = execFileSync('/bin/ps', ['-axo', 'pid=,command='], { encoding: 'utf8' });
+  return output.split('\n').flatMap(line => {
+    const match = line.match(/^\s*(\d+)\s+(.*)$/);
+    if (!match) return [];
+    const command = match[2].trim();
+    return command === binary || command.startsWith(binary + ' ') ? [Number(match[1])] : [];
+  });
+}
+function forceQuit(app) {
+  let signalled = 0;
+  for (const pid of runningPids(app)) {
+    try { process.kill(pid, 'SIGTERM'); signalled++; } catch (error) {
+      if (!['ESRCH', 'EPERM'].includes(error.code)) throw error;
+    }
+  }
+  return signalled;
+}
 function isSparkleUpdater(app, command) {
   const match = command.trim().match(/^(.*\/(?:Autoupdate|Updater\.app\/Contents\/MacOS\/Updater))(?:\s+(.*))?$/);
   if (!match) return false;
@@ -74,4 +93,4 @@ function assertRuntime(node) {
   return node;
 }
 module.exports = { requireMac, metadata, discoverApp, binaryPath, identityFiles, assertStopped, assertRuntime,
-  isRunning, isSparkleUpdater, sparkleBusy, requestQuit, openApp };
+  isRunning, runningPids, forceQuit, isSparkleUpdater, sparkleBusy, requestQuit, openApp };

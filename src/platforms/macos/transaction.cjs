@@ -76,7 +76,7 @@ function checkedRecord(state, app) {
 async function stage(app, destination, plan, metadata, state) {
   const identity = signing.ensureIdentity(state);
   const update = updateHook.plan(archivePath(app));
-  const targets = [...plan.targets, update];
+  const targets = mergeTargets(plan.targets, update);
   execFileSync('/bin/cp', ['-cR', app, destination]);
   let hashes;
   for (const target of targets) {
@@ -104,6 +104,22 @@ async function stage(app, destination, plan, metadata, state) {
   signing.sign(destination, state, { entitlements: path.join(__dirname, 'local-entitlements.plist'),
     identity, expectedCertificateSha256: identity.certificateSha256 });
   return identity.certificateSha256;
+}
+
+function mergeTargets(targets, extra) {
+  const merged = targets.map(target => ({ ...target, kinds: [...(target.kinds || [])] }));
+  const index = merged.findIndex(target => target.entry === extra.entry);
+  if (index === -1) return [...merged, extra];
+  const target = merged[index];
+  if (target.sourceSha256 !== extra.sourceSha256) {
+    throw new Error(`Conflicting source hashes for ASAR target ${extra.entry}.`);
+  }
+  // The updater and feature transforms can share one chunk. Reapply the
+  // updater transform to the already transformed bytes so staging patches the
+  // entry once against its original hash.
+  const patched = updateHook.adapt(target.patched.toString('utf8'));
+  merged[index] = { ...target, patched: Buffer.from(patched), kinds: [...target.kinds, ...(extra.kinds || [])] };
+  return merged;
 }
 
 function rollback(state, record, phase = 'rolled-back') {
@@ -261,4 +277,4 @@ function restore(app = discoverApp(), state = DEFAULT_STATE) {
   return rollback(state, record, 'restored');
 }
 module.exports = { DEFAULT_STATE, PATCH_ID, PATCH_REVISION, MARKER, archivePath, fingerprint, same, saveJson,
-  readJson, verify, version, marker, withLock, stage, swap, recover, install, restore, checkedRecord, recordPath };
+  readJson, verify, version, marker, withLock, stage, mergeTargets, swap, recover, install, restore, checkedRecord, recordPath };

@@ -18,8 +18,10 @@ function alreadyInstalled(app, state) {
 // The caller holds the transaction lock through preparation, activation and reopening.
 async function restart(app, state, { onPhase = () => {}, install = tx.install,
   running = platform.isRunning, quit = platform.requestQuit, open = platform.openApp,
+  forceQuit = platform.forceQuit,
   safeToOpen = () => !['prepared', 'activated', 'rollback-pending'].includes(tx.checkedRecord(state, app)?.phase),
-  patched = alreadyInstalled, beforeQuit = () => {}, timeoutMs = 30000, pollMs = 200, now = Date.now, wait = delay } = {}) {
+  patched = alreadyInstalled, beforeQuit = () => {}, allowForceQuit = false, timeoutMs = 30000,
+  forceQuitTimeoutMs = 10000, pollMs = 200, now = Date.now, wait = delay } = {}) {
   // A KeepAlive launchd job that re-invokes restart must not bounce an already patched app.
   if (patched(app, state)) {
     onPhase('already-installed');
@@ -44,10 +46,20 @@ async function restart(app, state, { onPhase = () => {}, install = tx.install,
       onPhase('requesting-quit');
       quitRequested = true;
       await quit(app);
-      const deadline = now() + timeoutMs;
-      while (running(app)) {
-        if (now() >= deadline) throw Object.assign(new Error('The app did not exit. Close any quit confirmation and retry. No app files were changed.'), { code: 'QUIT_TIMEOUT' });
-        await wait(pollMs);
+      const waitForExit = async (milliseconds, message) => {
+        const deadline = now() + milliseconds;
+        while (running(app)) {
+          if (now() >= deadline) throw Object.assign(new Error(message), { code: 'QUIT_TIMEOUT' });
+          await wait(pollMs);
+        }
+      };
+      try {
+        await waitForExit(timeoutMs, 'The app did not exit. Close any quit confirmation and retry. No app files were changed.');
+      } catch (error) {
+        if (error.code !== 'QUIT_TIMEOUT' || !allowForceQuit || !running(app)) throw error;
+        onPhase('forcing-quit');
+        await forceQuit(app);
+        await waitForExit(forceQuitTimeoutMs, 'The app did not exit after a normal and forced quit request. No app files were changed.');
       }
       closedAt = now();
     }

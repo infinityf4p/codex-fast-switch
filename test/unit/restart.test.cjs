@@ -132,6 +132,23 @@ test('cancelled quit times out without changing the app', async () => {
   assert.deepEqual(f.calls, ['quit', 'wait']);
 });
 
+test('manual setup can force terminate after a cancelled normal quit', async () => {
+  const f = fixture();
+  let appRunning = true;
+  await restart('/app', '/state', { ...f.options, timeoutMs: 200,
+    running: () => appRunning,
+    quit: () => f.calls.push('quit'),
+    forceQuit: () => { f.calls.push('force-quit'); appRunning = false; },
+    install: async (app, state, { beforeActivate }) => {
+      await beforeActivate();
+      f.calls.push('install');
+      assert.equal(appRunning, false);
+      return { status: 'installed' };
+    },
+    allowForceQuit: true });
+  assert.deepEqual(f.calls, ['quit', 'wait', 'force-quit', 'install', 'open']);
+});
+
 test('manual restart cancellation preserves the last successful build for update monitoring', async t => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'codex-fast-restart-state-'));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));

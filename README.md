@@ -34,6 +34,8 @@
 curl -fsSL https://infinityf4p.github.io/codex-fast-switch/install.sh | /bin/sh
 ```
 
+这就是补丁和后续更新的固定入口：不需要克隆仓库、修改本地脚本或安装 npm 依赖。每次执行都会下载最新通过 CI 的工具包，识别当前官方 App，应用对应版本的补丁并重新打开原来的 App。若 App 没有响应正常退出，手动执行这条命令会在等待后发送一次系统退出信号，再继续替换；自动更新监控仍会先保留原版并在失败时停止。
+
 安装后继续从原来的 App 图标启动。首次切换到本地签名时，若出现 `Codex Storage Key` 钥匙串提示，请选择“始终允许”；后续补丁复用同一张本机证书。[签名说明](docs/local-signing.md)
 
 ### Windows

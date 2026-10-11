@@ -48,8 +48,11 @@ function nodePath(root, target, keys = []) {
   }
   return null;
 }
-function replacement(source, fn, target, kind, modelSettingsPath, modelPath = ['model']) {
+function replacement(source, fn, target, kind, modelSettingsPath, modelPath = ['model'], recipe = {}) {
   const original = source.slice(target.start, target.end);
+  const left = target.left ? source.slice(target.left.start, target.left.end) : null;
+  const allowedValues = recipe.allowValues ?? [];
+  const allowList = allowedValues.map(value => `${left}===${JSON.stringify(value)}`).join('||');
   if (kind === 'models') {
     const settings = modelSettingsPath ? at(fn, modelSettingsPath) : fn.params[1];
     if (settings?.type !== 'Identifier' || target.type !== 'Identifier') throw new Error('Unsupported model query arguments.');
@@ -58,7 +61,9 @@ function replacement(source, fn, target, kind, modelSettingsPath, modelPath = ['
   if (kind === 'ui' && target.type === 'LogicalExpression' && target.operator === '||' &&
       target.left?.type === 'BinaryExpression' && target.right?.type === 'BinaryExpression') {
     const subject = target.left.left;
-    return `(${original}||${source.slice(subject.start, subject.end)}==="apikey")`;
+    const values = allowedValues.length ? allowedValues.map(value => `${source.slice(subject.start, subject.end)}===${JSON.stringify(value)}`) :
+      [`${source.slice(subject.start, subject.end)}==="apikey"`];
+    return `(${original}||${values.join('||')})`;
   }
   if (kind === 'request' && target.type === 'LogicalExpression' && target.operator === '&&' &&
       target.left?.type === 'BinaryExpression' && target.right?.type === 'BinaryExpression') {
@@ -66,7 +71,9 @@ function replacement(source, fn, target, kind, modelSettingsPath, modelPath = ['
     return `(${original}&&${source.slice(subject.start, subject.end)}!=="apikey")`;
   }
   if (target.type !== 'BinaryExpression') throw new Error('Unsupported authentication check.');
-  const left = source.slice(target.left.start, target.left.end);
+  if (allowedValues.length && (kind === 'request' || kind === 'saved-request')) {
+    return `(${original}||${allowList})`;
+  }
   if (kind === 'saved-request') return `(${original}||${left}==="apiKey")`;
   return kind === 'ui' ? `(${original}||${left}==="apikey")` : `(${original}&&${left}!=="apikey")`;
 }
@@ -95,7 +102,7 @@ function adapt(source, recipes) {
   const edits = matches.filter(match => !match.recipe.native).map(match => {
     const target = at(match.fn, match.recipe.path);
     return { ...match, start: target.start, end: target.end,
-      value: replacement(source, match.fn, target, match.recipe.kind, match.recipe.modelSettingsPath, match.recipe.modelPath) };
+      value: replacement(source, match.fn, target, match.recipe.kind, match.recipe.modelSettingsPath, match.recipe.modelPath, match.recipe) };
   });
   let patched = source;
   for (const edit of edits.toSorted((a, b) => b.start - a.start)) {
@@ -130,6 +137,7 @@ async function validateGates(matches) {
         };
         const allowed = auth !== null && !blocked;
         for (const [match, expected] of [[ui, allowed && !loading], [request, allowed], ...(saved ? [[saved, allowed]] : [])]) {
+          if (match.recipe.skipValidation) continue;
           const globals = {};
           for (const item of match.recipe.environment) globals[match.names[item.index]] = stubs[item.stub];
           globals.client = { query: { setData() {} }, requestClient: {}, logger: {}, getHostId: () => 'local',
@@ -249,7 +257,14 @@ async function planArchive(archive, recipes = defaultRecipes, iconRecipe = recip
   const required = new Set([...recipes.filter(recipe => !recipe.optional).map(recipe => recipe.kind), ...detectedRequirements,
     ...allMatches.flatMap(match => match.recipe.requires || [])]);
   for (const kind of new Set([...required, ...allMatches.map(match => match.recipe.kind)])) {
-    const scopes = new Set(recipes.filter(recipe => recipe.kind === kind).flatMap(recipe => recipe.scopes || ['webview']));
+    const kindRecipes = recipes.filter(recipe => recipe.kind === kind);
+    if (kindRecipes.some(recipe => recipe.anyScope)) {
+      if (allMatches.filter(item => item.recipe.kind === kind).length !== 1) {
+        throw new Error(`Cannot uniquely recognize ${kind} logic in any declared process scope.`);
+      }
+      continue;
+    }
+    const scopes = new Set(kindRecipes.flatMap(recipe => recipe.scopes || ['webview']));
     if (!scopes.size) scopes.add('webview');
     for (const scope of scopes) if (allMatches.filter(item => item.recipe.kind === kind && item.scope === scope).length !== 1) {
       throw new Error(`Cannot uniquely recognize ${kind} logic in ${scope}. The official app will be kept unchanged.`);

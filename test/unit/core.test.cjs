@@ -107,6 +107,20 @@ test('saved default speed accepts API keys while retaining other authentication 
     }
 });
 
+test('reviewed gate variants can allow a specific provider account type', () => {
+  const source = 'function current(account){const serviceTier=true;return account?.type === "chatgpt";}';
+  const fn = adaptive.parse(source).body[0];
+  const target = fn.body.body[1].argument;
+  const expected = source.replace('account?.type === "chatgpt"', '(account?.type === "chatgpt"||account?.type === "apiKey")');
+  const recipe = { kind: 'request', requiredMarker: 'serviceTier', allowValues: ['apiKey'],
+    fingerprint: adaptive.shape(fn).fingerprint,
+    patchedFingerprint: adaptive.shape(adaptive.parse(expected).body[0]).fingerprint,
+    path: adaptive.nodePath(fn, target), environment: [], skipValidation: true };
+  const result = adaptive.adapt(source, [recipe]);
+  assert.equal(result.matches.length, 1);
+  assert.match(result.patched, /account\?\.type === "chatgpt"\|\|account\?\.type===\"apiKey\"/);
+});
+
 test('reviewed nested model settings preserve host options and older model queries', () => {
   const source = 'function models(host,current){const {modelSettings}=current;const serviceTierForRequest=modelSettings.serviceTier;return getModels(host);}';
   const fn = adaptive.parse(source).body[0];
