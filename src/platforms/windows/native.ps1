@@ -1,6 +1,6 @@
 param(
     [Parameter(Mandatory = $true)]
-    [ValidateSet('discover', 'signature', 'processes', 'quit', 'open', 'identity', 'remove-identity', 'enable', 'disable', 'start-watch', 'shortcuts', 'remove-shortcuts', 'launch', 'start-update')]
+    [ValidateSet('discover', 'store-context', 'store-catalog', 'signature', 'processes', 'quit', 'open', 'identity', 'remove-identity', 'enable', 'disable', 'start-watch', 'shortcuts', 'remove-shortcuts', 'launch', 'start-update')]
     [string]$Action,
     [string]$Payload = 'e30='
 )
@@ -90,6 +90,27 @@ function Test-LocalIdentityPackage($package, [string[]]$roots) {
 }
 
 try { switch ($Action) {
+    'store-context' {
+        $packages = @(Get-AppxPackage -Name OpenAI.Codex | Where-Object {
+            $_.Publisher -eq 'CN=50BDFD77-8903-4850-9FFE-6E8522F64D5B' -and
+            $_.Status -eq 'Ok' -and -not $_.IsDevelopmentMode
+        } | ForEach-Object {
+            @{ app = (Join-Path $_.InstallLocation 'app'); version = $_.Version.ToString(); arch = $_.Architecture.ToString().ToLowerInvariant() }
+        })
+        $market = [Globalization.RegionInfo]::CurrentRegion.TwoLetterISORegionName
+        if ($market -notmatch '^[A-Za-z]{2}$') { $market = 'US' }
+        @{ packages = $packages; market = $market.ToUpperInvariant(); osVersion = [Environment]::OSVersion.Version.ToString() } | ConvertTo-Json -Depth 5 -Compress
+    }
+    'store-catalog' {
+        if ($data.market -cnotmatch '^[A-Z]{2}$') { throw 'Invalid Microsoft Store market.' }
+        [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
+        $ProgressPreference = 'SilentlyContinue'
+        # Use Windows' proxy settings, including proxies configured outside the app.
+        $uri = 'https://displaycatalog.mp.microsoft.com/v7.0/products?bigIds=9PLM9XGG6VKS&market=' + $data.market + '&languages=en-US'
+        $response = Invoke-WebRequest -Uri $uri -UseBasicParsing -TimeoutSec 15 -Headers @{'Cache-Control'='no-cache'}
+        if ($response.Content.Length -gt 2097152) { throw 'Microsoft Store returned an oversized response.' }
+        [Console]::WriteLine($response.Content)
+    }
     'discover' {
         $packages = @(Get-AppxPackage -Name OpenAI.Codex | Where-Object {
             $_.Publisher -eq 'CN=50BDFD77-8903-4850-9FFE-6E8522F64D5B' -and

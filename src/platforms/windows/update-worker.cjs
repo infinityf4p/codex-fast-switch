@@ -1,7 +1,7 @@
 async function main() {
   const [command, state, id, token] = process.argv.slice(2);
   if (!state || !id || !['check', 'start', 'install'].includes(command)) throw new Error('Invalid update helper arguments.');
-  if (command === 'check') return require('./updates.cjs').check(state, id);
+  if (command === 'check') return require('./updates.cjs').checkForUpdates(state, id, { force: token === 'force' });
   return require('./update-handoff.cjs')[command](state, id, token);
 }
 

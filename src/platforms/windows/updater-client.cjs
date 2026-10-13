@@ -20,16 +20,23 @@ module.exports = function createUpdater(manager, binding, dependencies = {}) {
     current: '\u672c\u673a\u5df2\u5b89\u88c5\u7684 Codex \u7248\u672c\u5df2\u540c\u6b65',
     store: '\u6253\u5f00 Microsoft Store', close: '\u5173\u95ed',
     storeDetail: '\u53ef\u5728 Microsoft Store \u67e5\u770b\u662f\u5426\u6709\u66f4\u65b0\u7684\u5b98\u65b9\u7248\u672c\u3002',
+    officialReady: '官方新版已发布', officialCurrent: '官方商店版本已同步',
+    officialDetail: '请先在 Microsoft Store 更新 ChatGPT（Codex）。安装完成后，这里会继续提示同步补丁。商店可能分批向设备提供更新。',
+    unknown: '暂时无法检查官方更新', unknownDetail: '无法确认商店最新版本。请检查网络，或在 Microsoft Store 中检查更新。',
   } : { failed: 'Update did not complete', current: 'The installed Codex version is up to date',
-    store: 'Open Microsoft Store', close: 'Close', storeDetail: 'Check Microsoft Store for a newer official version.' };
+    store: 'Open Microsoft Store', close: 'Close', storeDetail: 'Check Microsoft Store for a newer official version.',
+    officialReady: 'A newer official version is published', officialCurrent: 'The official Store version is up to date',
+    officialDetail: 'Update ChatGPT (Codex) in Microsoft Store first. Once it is installed, this app will offer to sync the patch. Store updates may roll out to devices gradually.',
+    unknown: 'Could not check official updates', unknownDetail: 'The latest Store version could not be verified. Check your connection or check for updates in Microsoft Store.' };
   const showError = error => dialog.showMessageBox({ type: 'error', title: words.failed,
     message: words.failed, detail: error.message || String(error), buttons: [words.close] });
   const setReady = value => { ready = value; manager.setUpdateReady(value); };
 
-  function query() {
+  function query(force = false) {
+    if (force && inFlightCheck) return inFlightCheck.catch(() => {}).then(() => query(true));
     if (!inFlightCheck) {
       inFlightCheck = new Promise((resolve, reject) => {
-        execFile(node, args, { windowsHide: true, timeout: 90000, maxBuffer: 1024 * 1024 }, (error, stdout) => {
+        execFile(node, force ? [...args, 'force'] : args, { windowsHide: true, timeout: 90000, maxBuffer: 1024 * 1024 }, (error, stdout) => {
           try {
             const result = JSON.parse(stdout);
             if (error || result.error) throw new Error(result.error || error.message);
@@ -46,15 +53,19 @@ module.exports = function createUpdater(manager, binding, dependencies = {}) {
     if (inFlightInstall) return;
     if (manual) manager.setUpdateLifecycleState('checking');
     try {
-      const result = await query();
+      const result = await query(manual);
       setReady(result.available);
       manager.setUpdateLifecycleState(ready ? 'ready' : 'idle');
       if (result.failure && result.failure.id !== lastFailure) {
         lastFailure = result.failure.id;
         await showError(new Error(result.failure.error));
       } else if (manual && !ready) {
-        const response = await dialog.showMessageBox({ type: 'info', message: words.current,
-          detail: words.storeDetail, buttons: [words.store, words.close], defaultId: 1, cancelId: 1 });
+        const unknown = result.official?.status === 'unknown';
+        const current = result.official?.status === 'current';
+        const response = await dialog.showMessageBox({ type: unknown ? 'warning' : 'info',
+          message: unknown ? words.unknown : current ? words.officialCurrent : words.current,
+          detail: unknown ? words.unknownDetail : current ? result.official.installedVersion : words.storeDetail,
+          buttons: [words.store, words.close], defaultId: 1, cancelId: 1 });
         if (response.response === 0) await shell.openExternal(storeUrl);
       }
     } catch (error) {
@@ -75,8 +86,27 @@ module.exports = function createUpdater(manager, binding, dependencies = {}) {
       } finally { if (fs.existsSync(temporary)) fs.unlinkSync(temporary); }
     };
     try {
-      const result = await query();
-      if (!result.available) { setReady(false); manager.setUpdateLifecycleState('idle'); return; }
+      const result = await query(true);
+      // A published Store package is not yet a local payload that can be patched.
+      // Keep the native update indicator, and route this stage to the official Store.
+      if (result.official?.status === 'available') {
+        setReady(true);
+        manager.setUpdateLifecycleState('ready');
+        const response = await dialog.showMessageBox({ type: 'info', message: words.officialReady,
+          detail: `${result.official.installedVersion} → ${result.official.version}\n\n${words.officialDetail}`,
+          buttons: [words.store, words.close], defaultId: 0, cancelId: 1 });
+        if (response.response === 0) await shell.openExternal(storeUrl);
+        return;
+      }
+      if (!result.available) {
+        setReady(false); manager.setUpdateLifecycleState('idle');
+        if (result.official?.status === 'unknown') {
+          const response = await dialog.showMessageBox({ type: 'warning', message: words.unknown,
+            detail: words.unknownDetail, buttons: [words.store, words.close], defaultId: 1, cancelId: 1 });
+          if (response.response === 0) await shell.openExternal(storeUrl);
+        }
+        return;
+      }
       manager.setUpdateLifecycleState('installing');
       const token = crypto.randomUUID();
       file = path.join(binding.state, 'windows-update-' + token + '.json');

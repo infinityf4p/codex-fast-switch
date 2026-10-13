@@ -3,7 +3,7 @@ const path = require('node:path');
 const store = require('./store.cjs');
 const platform = require('./platform.cjs');
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
-const files = new Set(['windows.json', 'windows-active.json', 'windows-status.json', 'windows-monitor.log', 'windows-update.json']);
+const files = new Set(['windows.json', 'windows-active.json', 'windows-status.json', 'windows-monitor.log', 'windows-update.json', 'windows-store-update.json']);
 const directories = new Set(['versions', 'agent', 'watcher', 'automatic.lock']);
 
 function checkedPath(state, target) {
@@ -26,7 +26,7 @@ function plan(state, { allowInstalledRuntime = false } = {}) {
   for (const name of fs.readdirSync(state)) {
     const target = path.join(state, name);
     const info = checkedPath(state, target);
-    const temporaryRecord = /^windows(?:-active|-status|-update)?\.json\.[a-f0-9-]{36}\.tmp$/.test(name);
+    const temporaryRecord = /^windows(?:-active|-status|-update|-store-update)?\.json\.[a-f0-9-]{36}\.tmp$/.test(name);
     const updateHandoff = /^windows-update-[a-f0-9-]{36}\.json(?:\.[a-f0-9-]{36}\.tmp)?$/.test(name);
     if (!((files.has(name) || temporaryRecord || updateHandoff) && info.isFile()) && !(directories.has(name) && info.isDirectory())) {
       throw new Error(`The state directory contains an unrecognized item; it will not be deleted: ${target}`);

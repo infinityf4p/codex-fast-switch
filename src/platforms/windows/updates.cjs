@@ -47,6 +47,14 @@ function check(state, id, { resolve = store.resolveSource, metadata = platform.m
     failure: job?.status === 'failed' && job.fromId === id ? { id: job.id, error: job.error } : null };
 }
 
+function checkForUpdates(state, id, { force = false, localCheck = check,
+  officialCheck = require('./store-catalog.cjs').check } = {}) {
+  const local = localCheck(state, id);
+  const official = officialCheck(state, local.source, { force });
+  return { ...local, localAvailable: local.available, official,
+    available: local.available || official.status === 'available' };
+}
+
 async function install(state, id, { ready, installCopy = launcher.install, resolve = store.resolveSource,
   verify = platform.verify, stopped = platform.assertStopped, same = platform.same, open = platform.openApp,
   preflight = store.doctor, stamp = platform.stamp, now = Date.now, wait = delay, timeoutMs = 120000 } = {}) {
@@ -119,4 +127,4 @@ async function install(state, id, { ready, installCopy = launcher.install, resol
   }
 }
 
-module.exports = { check, install, recordFor, jobPath };
+module.exports = { check, checkForUpdates, install, recordFor, jobPath };

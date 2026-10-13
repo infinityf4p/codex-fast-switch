@@ -1,5 +1,13 @@
 # Tested builds
 
+## 2026-10-13: Windows online official update detection
+
+The local suite passed **211 tests**, with **11 platform-specific skips** and **0 failures**. JavaScript/JSON, PowerShell and generated-script checks passed, and the Windows ZIP and standalone scripts built successfully.
+
+A real read-only query through the new Windows helper and system proxy found the installed official MSIX **26.915.4065.0** and the newer CN catalog package **26.1007.2314.0**, returning `available`. The running Fast app was **26.915.31945 (9922)**; MSIX and internal app version numbers are deliberately compared separately. WinGet recognized the product as ChatGPT but returned no available upgrade, so this check does not claim a completed official Store download or a full update to the new app build.
+
+Regression cases cover numeric package versions, exact family/architecture and Windows requirements, cache expiry, manual refresh, installed-version invalidation, network-failure backoff, retained update hints while offline, custom sources, cache cleanup, native readiness, opening only the official Store on an online-only update without a quit/handoff, and continuing the existing local patch handoff after Store installation. These cases use simulated UI and download states; they do not claim a live desktop update-button click.
+
 ## 2026-09-21: installation from tested main builds
 
 The local suite passed **194 tests**, with **11 platform-specific skips** and **0 failures**. Source, PowerShell and generated-bootstrap checks passed; workflow YAML parsed; the Windows ZIP and fixed standalone scripts packaged successfully.

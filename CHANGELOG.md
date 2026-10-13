@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Windows patch revision 8 checks Microsoft's online Store catalog as well as the installed official app. Published official updates feed the native update indicator before local installation; the action opens the official Store, then resumes the existing patch handoff after the official package updates. Respect architecture, Windows requirements and regional catalog; cache background queries, force manual refresh, retain known updates offline, and report failed checks without claiming the official app is current. Remove the query cache during uninstall.
+
 - Disable Electron's embedded ASAR integrity slot after rewriting the archive hash, then re-sign the changed framework before signing the patched app. This prevents the 0.7-second startup crash introduced by newer Electron frameworks.
 - Publish complete macOS and Windows downloads automatically after all main-branch CI checks pass. The one-click commands use a fixed download site, resolve the latest tested Git commit on each run, validate archive checksums and embedded build identities, and retry a concurrent deployment with fresh metadata. Saved online Windows scripts check for updates on every run; fixed Release ZIPs and bundled scripts remain available. No new background tool-update task is added.
 - Prepare the local package identity required by newer Windows Owl runtimes and activate the registered copy through Windows package activation.

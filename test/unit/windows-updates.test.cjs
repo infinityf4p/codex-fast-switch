@@ -30,13 +30,13 @@ test('native updater adaptation changes only a recognized Windows initializer', 
   assert.throws(() => adapt(source + source.replace('class Manager', 'class Other'), {}, accepted), { code: 'UNSUPPORTED_UPDATER' });
 });
 
-function clientFixture(t) {
+function clientFixture(t, { responseButton = 1 } = {}) {
   const state = fs.mkdtempSync(path.join(os.tmpdir(), 'codex-fast-client-'));
   t.after(() => fs.rmSync(state, { recursive: true, force: true }));
   const app = new EventEmitter();
   app.getLocale = () => 'en';
   app.getPath = () => 'C:\\Profiles\\A & B';
-  const dialogs = [], events = [];
+  const dialogs = [], events = [], opened = [], queryOptions = [];
   let response = { available: true };
   let helper = null;
   let queries = 0;
@@ -45,8 +45,8 @@ function clientFixture(t) {
     prepareWindowsUpdate: async () => events.push(['prepare']),
     options: { onInstallUpdatesRequested: () => events.push(['quit']), onInstallUpdatesAborted: () => events.push(['abort']) } };
   const client = createUpdater(manager, { state, id: 'id' }, {
-    electron: { app, dialog: { showMessageBox: async data => { dialogs.push(data); return { response: 1 }; } },
-      shell: { openExternal: () => assert.fail('must not open a store during background checks') } },
+    electron: { app, dialog: { showMessageBox: async data => { dialogs.push(data); return { response: responseButton }; } },
+      shell: { openExternal: url => opened.push(url) } },
     childProcess: {
       execFile: (_node, args, options, callback) => {
         assert.equal(options.windowsHide, true);
@@ -54,12 +54,12 @@ function clientFixture(t) {
           const file = handoff.ticketPath(state, args[4]);
           helper = { file, setStatus: extra => store.saveJson(file, { ...store.readOptional(file), ...extra }) };
           queueMicrotask(() => callback(null, JSON.stringify({ started: true })));
-        } else { queries++; queueMicrotask(() => callback(null, JSON.stringify(response))); }
+        } else { queries++; queryOptions.push(args[4]); queueMicrotask(() => callback(null, JSON.stringify(response))); }
       },
     },
   });
   t.after(() => app.emit('will-quit'));
-  return { client, dialogs, events, setResponse: value => { response = value; }, get helper() { return helper; }, get queries() { return queries; } };
+  return { client, dialogs, events, opened, queryOptions, setResponse: value => { response = value; }, get helper() { return helper; }, get queries() { return queries; } };
 }
 
 test('background checks feed native readiness without launching the Store or quitting', async t => {
@@ -68,11 +68,46 @@ test('background checks feed native readiness without launching the Store or qui
   assert.equal(f.queries, 1);
   assert.equal(f.client.getIsUpdateReady(), true);
   assert.deepEqual(f.dialogs, []);
+  assert.deepEqual(f.opened, []);
   assert.equal(f.events.some(event => event[0] === 'quit'), false);
   f.setResponse({ available: false });
   await f.client.checkForUpdates();
   assert.equal(f.client.getIsUpdateReady(), false);
   assert.equal(f.dialogs[0].buttons[0], 'Open Microsoft Store');
+  assert.equal(f.queryOptions.at(-1), 'force');
+});
+
+test('an online-only update uses the native indicator and opens the official Store without starting a patch handoff', async t => {
+  const f = clientFixture(t, { responseButton: 0 });
+  f.setResponse({ available: true, localAvailable: false,
+    official: { status: 'available', installedVersion: '26.915.4065.0', version: '26.1007.2314.0' } });
+  await f.client.checkForUpdatesInBackground();
+  assert.equal(f.client.getIsUpdateReady(), true);
+  assert.deepEqual(f.opened, []);
+  await f.client.installUpdatesIfAvailable();
+  assert.deepEqual(f.opened, ['ms-windows-store://pdp/?ProductId=9PLM9XGG6VKS']);
+  assert.equal(f.helper, null);
+  assert.equal(f.events.some(event => ['quit', 'prepare'].includes(event[0])), false);
+  assert.match(f.dialogs[0].detail, /26\.1007\.2314\.0/);
+  // After Store installation, the same native action resumes the existing patch flow.
+  f.setResponse({ available: true, localAvailable: true, official: { status: 'current' } });
+  const operation = f.client.installUpdatesIfAvailable();
+  await new Promise(resolve => setImmediate(resolve));
+  f.helper.setStatus({ status: 'ready' });
+  await operation;
+  assert.deepEqual(f.events.slice(-2), [['prepare'], ['quit']]);
+});
+
+test('a manual offline Store check never claims the official app is current', async t => {
+  const f = clientFixture(t);
+  f.setResponse({ available: false, localAvailable: false, official: { status: 'unknown' } });
+  await f.client.checkForUpdates();
+  assert.equal(f.dialogs[0].type, 'warning');
+  assert.equal(f.dialogs[0].message, 'Could not check official updates');
+  assert.equal(f.events.some(event => event[0] === 'quit'), false);
+  await f.client.installUpdatesIfAvailable();
+  assert.equal(f.dialogs[1].message, 'Could not check official updates');
+  assert.equal(f.helper, null);
 });
 
 test('the native Update action waits for helper readiness and preserves the profile', async t => {
