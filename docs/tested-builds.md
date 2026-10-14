@@ -1,5 +1,13 @@
 # Tested builds
 
+## 2026-10-14: automatic official Windows installation before patch handoff
+
+Patch revision **9** passed **220 tests**, with **11 platform-specific skips** and **0 failures**, plus source, generated-script and Windows PowerShell syntax checks. New regressions cover one native click waiting for official installation before patch handoff, progress reporting, failure without quitting, numeric versions, feed identity and architecture, registered-version verification, no downgrade, shared-lock exclusion and cleanup. Real PowerShell tests validate synthetic MSIX manifests and propagate simulated Windows signature failures without installing software in CI.
+
+The actual official helper downloaded the production feed's signed x64 MSIX through the existing Windows proxy and upgraded the registered official package from **26.1007.2314.0** to **26.1007.9446.0**. Windows deployment handled the official sandbox service without a separate Store UI action. The personal Fast generation remained **26.1007.21434 (13901)**, revision 8; its active pointer and observed app/CLI process IDs and creation times remained unchanged. The new official app **26.1007.71326 (20398)** passed all **12** compatibility gate cases, including the native updater adapter, without adding build-specific hashes.
+
+This live check exercised official download, package validation and Windows installation while a Fast conversation remained open. The subsequent quit, patch and relaunch sequence was covered by regression tests and earlier isolated native-button checks, not repeated against the personal conversation. Native download-progress callbacks were tested with a simulated manager; this run did not verify their rendered UI or the UAC retry branch.
+
 ## 2026-10-13: Windows online official update detection
 
 The local suite passed **211 tests**, with **11 platform-specific skips** and **0 failures**. JavaScript/JSON, PowerShell and generated-script checks passed, and the Windows ZIP and standalone scripts built successfully.

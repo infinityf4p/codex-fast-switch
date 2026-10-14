@@ -39,9 +39,11 @@ function clientFixture(t, { responseButton = 1 } = {}) {
   const dialogs = [], events = [], opened = [], queryOptions = [];
   let response = { available: true };
   let helper = null;
+  let official = null;
   let queries = 0;
   const manager = { setUpdateReady: value => events.push(['ready', value]),
     setUpdateLifecycleState: value => events.push(['state', value]),
+    setDownloadProgressPercent: value => events.push(['progress', value]),
     prepareWindowsUpdate: async () => events.push(['prepare']),
     options: { onInstallUpdatesRequested: () => events.push(['quit']), onInstallUpdatesAborted: () => events.push(['abort']) } };
   const client = createUpdater(manager, { state, id: 'id' }, {
@@ -50,7 +52,11 @@ function clientFixture(t, { responseButton = 1 } = {}) {
     childProcess: {
       execFile: (_node, args, options, callback) => {
         assert.equal(options.windowsHide, true);
-        if (args[1] === 'start') {
+        if (args[1] === 'official') {
+          official = { complete: value => callback(null, JSON.stringify(value)),
+            progress: value => store.saveJson(path.join(state, 'windows-official-update.json'),
+              { id: 'id', checkedAt: Date.now(), ...value }) };
+        } else if (args[1] === 'start') {
           const file = handoff.ticketPath(state, args[4]);
           helper = { file, setStatus: extra => store.saveJson(file, { ...store.readOptional(file), ...extra }) };
           queueMicrotask(() => callback(null, JSON.stringify({ started: true })));
@@ -59,7 +65,8 @@ function clientFixture(t, { responseButton = 1 } = {}) {
     },
   });
   t.after(() => app.emit('will-quit'));
-  return { client, dialogs, events, opened, queryOptions, setResponse: value => { response = value; }, get helper() { return helper; }, get queries() { return queries; } };
+  return { client, dialogs, events, opened, queryOptions, setResponse: value => { response = value; },
+    get official() { return official; }, get helper() { return helper; }, get queries() { return queries; } };
 }
 
 test('background checks feed native readiness without launching the Store or quitting', async t => {
@@ -77,25 +84,61 @@ test('background checks feed native readiness without launching the Store or qui
   assert.equal(f.queryOptions.at(-1), 'force');
 });
 
-test('an online-only update uses the native indicator and opens the official Store without starting a patch handoff', async t => {
+test('one native click installs the official update before patch handoff and preserves the profile', async t => {
   const f = clientFixture(t, { responseButton: 0 });
   f.setResponse({ available: true, localAvailable: false,
     official: { status: 'available', installedVersion: '26.915.4065.0', version: '26.1007.2314.0' } });
   await f.client.checkForUpdatesInBackground();
   assert.equal(f.client.getIsUpdateReady(), true);
   assert.deepEqual(f.opened, []);
-  await f.client.installUpdatesIfAvailable();
-  assert.deepEqual(f.opened, ['ms-windows-store://pdp/?ProductId=9PLM9XGG6VKS']);
+  const operation = f.client.installUpdatesIfAvailable();
+  assert.equal(f.client.installUpdatesIfAvailable(), operation);
+  await new Promise(resolve => setImmediate(resolve));
+  assert.ok(f.official);
+  assert.deepEqual(f.opened, []);
   assert.equal(f.helper, null);
   assert.equal(f.events.some(event => ['quit', 'prepare'].includes(event[0])), false);
-  assert.match(f.dialogs[0].detail, /26\.1007\.2314\.0/);
-  // After Store installation, the same native action resumes the existing patch flow.
+  f.official.progress({ phase: 'downloading', percent: 48 });
+  await new Promise(resolve => setTimeout(resolve, 550));
+  assert.ok(f.events.some(event => event[0] === 'progress' && event[1] === 48));
+  // No second click is needed after Windows registers the new official package.
   f.setResponse({ available: true, localAvailable: true, official: { status: 'current' } });
-  const operation = f.client.installUpdatesIfAvailable();
+  f.official.complete({ status: 'installed', version: '26.1007.2314.0' });
   await new Promise(resolve => setImmediate(resolve));
   f.helper.setStatus({ status: 'ready' });
   await operation;
   assert.deepEqual(f.events.slice(-2), [['prepare'], ['quit']]);
+  assert.equal(store.readOptional(f.helper.file).userData, 'C:\\Profiles\\A & B');
+  assert.deepEqual(f.dialogs, []);
+  assert.deepEqual(f.opened, []);
+});
+
+test('failed official download or installation leaves the current app running and allows retry', async t => {
+  const f = clientFixture(t);
+  f.setResponse({ available: true, localAvailable: false, official: { status: 'available' } });
+  await f.client.checkForUpdatesInBackground();
+  for (const error of ['Network unavailable', 'Windows rejected the package signature']) {
+    const operation = f.client.installUpdatesIfAvailable();
+    await new Promise(resolve => setImmediate(resolve));
+    f.official.complete({ error });
+    await operation;
+    assert.equal(f.dialogs.at(-1).detail, error);
+    assert.equal(f.helper, null);
+    assert.equal(f.events.some(event => ['quit', 'prepare'].includes(event[0])), false);
+    assert.equal(f.client.getIsUpdateReady(), true);
+    assert.deepEqual(f.opened, []);
+  }
+});
+
+test('a catalog-only version without a released download does not begin a spurious copy update', async t => {
+  const f = clientFixture(t);
+  f.setResponse({ available: true, localAvailable: false, official: { status: 'available' } });
+  const operation = f.client.installUpdatesIfAvailable();
+  await new Promise(resolve => setImmediate(resolve));
+  f.official.complete({ status: 'current' });
+  await operation;
+  assert.equal(f.helper, null);
+  assert.match(f.dialogs[0].detail, /does not have an automatic download/);
 });
 
 test('a manual offline Store check never claims the official app is current', async t => {

@@ -2,16 +2,10 @@ const fs = require('node:fs');
 const path = require('node:path');
 const platform = require('./platform.cjs');
 const { saveJson } = require('../../core/state.cjs');
+const { version, release } = require('./official-release.cjs');
 const PRODUCT = '9PLM9XGG6VKS';
 const FAMILY = 'OpenAI.Codex_2p2nqsd0c76g0';
 const cachePath = state => path.join(state, 'windows-store-update.json');
-
-function version(value) {
-  if (typeof value !== 'string' || !/^\d+(?:\.\d+){3}$/.test(value)) throw new Error('Invalid Microsoft Store package version.');
-  const parts = value.split('.').map(Number);
-  if (parts.some(part => !Number.isInteger(part) || part > 65535)) throw new Error('Invalid Microsoft Store package version.');
-  return parts.reduce((result, part) => (result << 16n) | BigInt(part), 0n);
-}
 
 function latestVersion(catalog, arch, osVersion) {
   const product = catalog?.Products?.filter(item => item.ProductId === PRODUCT);
@@ -50,15 +44,19 @@ function check(state, source, { force = false, now = Date.now, native = platform
     key = JSON.stringify([context.market, installed.arch, installed.version, context.osVersion]);
     try { previous = JSON.parse(fs.readFileSync(file, 'utf8')); } catch {}
     const age = checkedAt - previous?.checkedAt;
-    if (!force && previous?.schemaVersion === 1 && previous.key === key && age >= 0 &&
+    if (!force && previous?.schemaVersion === 2 && previous.key === key && age >= 0 &&
         age < (previous.error ? 120000 : 1800000)) {
       if (previous.error) throw new Error(previous.error);
       version(previous.version);
       return { status: version(previous.version) > version(installed.version) ? 'available' : 'current',
         installedVersion: installed.version, version: previous.version, checkedAt: previous.checkedAt };
     }
-    const latest = latestVersion(native('store-catalog', { market: context.market }), installed.arch, context.osVersion);
-    try { saveJson(file, { schemaVersion: 1, key, version: latest, checkedAt }); } catch {}
+    // Use the same signed MSIX release feed as the official updater. Store catalog
+    // publication can lag this feed, and the Store app need not be able to connect.
+    let latest;
+    try { latest = release(native('official-feed'), installed.arch).version; }
+    catch { latest = latestVersion(native('store-catalog', { market: context.market }), installed.arch, context.osVersion); }
+    try { saveJson(file, { schemaVersion: 2, key, version: latest, checkedAt }); } catch {}
     return { status: version(latest) > version(installed.version) ? 'available' : 'current',
       installedVersion: installed.version, version: latest, checkedAt };
   } catch (error) {
@@ -69,10 +67,10 @@ function check(state, source, { force = false, now = Date.now, native = platform
       if (previous?.key === key && version(previous.version) > version(installed.version)) known = previous.version;
     } catch {}
     if (key && (previous?.key !== key || !previous?.error || force || checkedAt - previous.checkedAt >= 120000)) {
-      try { saveJson(file, { schemaVersion: 1, key, checkedAt, version: known, error: error.message }); } catch {}
+      try { saveJson(file, { schemaVersion: 2, key, checkedAt, version: known, error: error.message }); } catch {}
     }
     return { status: known ? 'available' : 'unknown', installedVersion: installed?.version,
-      version: known, stale: Boolean(known), error: 'Could not check Microsoft Store. Check your connection or open the Store.' };
+      version: known, stale: Boolean(known), error: 'Could not check official updates. Check your connection or open Microsoft Store.' };
   }
 }
 

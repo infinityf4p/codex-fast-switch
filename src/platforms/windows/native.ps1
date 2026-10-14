@@ -1,6 +1,6 @@
 param(
     [Parameter(Mandatory = $true)]
-    [ValidateSet('discover', 'store-context', 'store-catalog', 'signature', 'processes', 'quit', 'open', 'identity', 'remove-identity', 'enable', 'disable', 'start-watch', 'shortcuts', 'remove-shortcuts', 'launch', 'start-update')]
+    [ValidateSet('discover', 'store-context', 'store-catalog', 'official-feed', 'signature', 'processes', 'quit', 'open', 'identity', 'remove-identity', 'enable', 'disable', 'start-watch', 'shortcuts', 'remove-shortcuts', 'launch', 'start-update')]
     [string]$Action,
     [string]$Payload = 'e30='
 )
@@ -90,6 +90,13 @@ function Test-LocalIdentityPackage($package, [string[]]$roots) {
 }
 
 try { switch ($Action) {
+    'official-feed' {
+        [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
+        $ProgressPreference = 'SilentlyContinue'
+        $response = Invoke-WebRequest -Uri 'https://persistent.oaistatic.com/codex-app-prod/windows-store-update.json' -UseBasicParsing -TimeoutSec 15 -Headers @{'Cache-Control'='no-cache'}
+        if ($response.Content.Length -gt 65536) { throw 'The official update feed is oversized.' }
+        [Console]::WriteLine($response.Content)
+    }
     'store-context' {
         $packages = @(Get-AppxPackage -Name OpenAI.Codex | Where-Object {
             $_.Publisher -eq 'CN=50BDFD77-8903-4850-9FFE-6E8522F64D5B' -and

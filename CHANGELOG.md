@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Windows patch revision 9 completes official download, signed MSIX installation and patch handoff from one native Update click. Prefer the production app's release feed over the sometimes delayed Store catalog, use Windows proxy settings, display native download progress and verify Windows registration before preparing the copy. Handle the official background service through target-package deployment and request UAC only when Windows requires elevation. Download or compatibility failures keep the current app open; never downgrade official packages. Uninstall also cleans owned download and progress files.
 - Windows patch revision 8 checks Microsoft's online Store catalog as well as the installed official app. Published official updates feed the native update indicator before local installation; the action opens the official Store, then resumes the existing patch handoff after the official package updates. Respect architecture, Windows requirements and regional catalog; cache background queries, force manual refresh, retain known updates offline, and report failed checks without claiming the official app is current. Remove the query cache during uninstall.
 
 - Disable Electron's embedded ASAR integrity slot after rewriting the archive hash, then re-sign the changed framework before signing the patched app. This prevents the 0.7-second startup crash introduced by newer Electron frameworks.

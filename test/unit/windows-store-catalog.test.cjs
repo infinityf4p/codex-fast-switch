@@ -36,6 +36,7 @@ function fixture(t) {
   const options = { now: () => time, realpath: value => value,
     native(action, data) {
       if (action === 'store-context') return context;
+      if (action === 'official-feed') throw new Error('Feed unavailable; exercise the Store fallback');
       assert.equal(action, 'store-catalog'); assert.deepEqual(data, { market: context.market });
       requests++;
       if (offline) throw new Error('Network unavailable');
@@ -82,6 +83,23 @@ test('custom sources do not trigger Store checks and malformed cache does not su
   assert.equal(f.requests, 0);
   fs.writeFileSync(catalog.cachePath(f.state), '{broken');
   assert.equal(f.check().status, 'available');
+});
+
+test('the official release feed takes priority over a lagging catalog and invalidates revision-8 cache', t => {
+  const f = fixture(t);
+  f.check();
+  const cached = JSON.parse(fs.readFileSync(catalog.cachePath(f.state), 'utf8'));
+  fs.writeFileSync(catalog.cachePath(f.state), JSON.stringify({ ...cached, schemaVersion: 1 }));
+  let feedRequests = 0;
+  const options = { native(action) {
+    if (action === 'store-context') return f.context;
+    assert.equal(action, 'official-feed'); feedRequests++;
+    return { schemaVersion: 1, storeProductId: '9PLM9XGG6VKS', packageIdentity: 'OpenAI.Codex', buildVersion: '26.1007.9446.0' };
+  } };
+  assert.equal(f.check(options).version, '26.1007.9446.0');
+  f.check(options);
+  assert.equal(feedRequests, 1);
+  assert.equal(f.requests, 1);
 });
 
 test('native readiness includes online releases but local updates remain available when the Store is offline', () => {
