@@ -196,7 +196,7 @@ try {
         catch {
             # A package containing services can require Windows administrator consent.
             # Retry once through UAC, with the exact same validated package and user.
-            if ($_.ToString() -notmatch '80073D28|80070005|[Aa]ccess.*denied|拒绝访问') { throw }
+            if ($_.ToString() -notmatch '80073D28|80070005|[Aa]ccess.*denied|\u62d2\u7edd\u8bbf\u95ee') { throw }
             Send-Progress @{ phase = 'awaiting-elevation' }
             $token = [Guid]::NewGuid().ToString()
             $data | Add-Member userSid ([Security.Principal.WindowsIdentity]::GetCurrent().User.Value)

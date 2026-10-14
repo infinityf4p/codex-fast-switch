@@ -2,7 +2,15 @@ param([string]$Root, [string]$Temporary)
 $ErrorActionPreference = 'Stop'
 $env:PSModulePath = (Join-Path $PSHOME 'Modules') + ';' + (Join-Path $env:ProgramFiles 'WindowsPowerShell\Modules')
 $tokens = $null; $errors = $null
-$ast = [Management.Automation.Language.Parser]::ParseFile((Join-Path $Root 'src\platforms\windows\official-update.ps1'), [ref]$tokens, [ref]$errors)
+$scriptFile = Join-Path $Root 'src\platforms\windows\official-update.ps1'
+# Windows PowerShell 5.1 reads BOM-less scripts using the system ANSI code page.
+# Both English and Chinese Windows must parse the production entry point.
+foreach ($codePage in @(1252, 936)) {
+    $text = [Text.Encoding]::GetEncoding($codePage).GetString([IO.File]::ReadAllBytes($scriptFile))
+    [void][Management.Automation.Language.Parser]::ParseInput($text, [ref]$tokens, [ref]$errors)
+    if ($errors.Count) { throw ('Script does not parse on code page ' + $codePage + ': ' + ($errors | Out-String)) }
+}
+$ast = [Management.Automation.Language.Parser]::ParseFile($scriptFile, [ref]$tokens, [ref]$errors)
 if ($errors.Count) { throw ($errors | Out-String) }
 foreach ($definition in $ast.FindAll({ param($node) $node -is [Management.Automation.Language.FunctionDefinitionAst] }, $false)) {
     . ([scriptblock]::Create($definition.Extent.Text))
