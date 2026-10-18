@@ -4,16 +4,22 @@ const crypto = require('node:crypto');
 const platform = require('./platform.cjs');
 const store = require('./store.cjs');
 const launcher = require('./launcher.cjs');
-const WORKER_LAYOUT = 1;
+const WORKER_LAYOUT = 2;
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 const stamp = platform.stamp;
 const serviceName = state => `Codex Fast Switch ${crypto.createHash('sha256').update(path.resolve(state).toLowerCase()).digest('hex').slice(0, 12)}`;
 
 async function tick(state, { resolve = store.resolveSource, stopped = platform.assertStopped,
-  install = launcher.install, repairShortcuts = launcher.refresh, getStamp = stamp, now = Date.now } = {}) {
+  install = launcher.install, repairShortcuts = launcher.refresh, getStamp = stamp, now = Date.now,
+  recoverUpdate = require('./updates.cjs').recover } = {}) {
   return store.withLock(state, async () => {
     const config = store.readOptional(store.configPath(state));
     if (!config?.enabled) return { status: 'disabled' };
+    const recovered = recoverUpdate(state);
+    if (recovered) {
+      store.saveJson(store.statusPath(state), { ...recovered, checkedAt: new Date(now()).toISOString(), error: null });
+      return recovered;
+    }
     const previous = store.readOptional(store.statusPath(state)) || {};
     const finish = (status, extra = {}) => {
       const result = { ...previous, status, checkedAt: new Date(now()).toISOString(), ...extra };

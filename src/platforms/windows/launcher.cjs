@@ -42,7 +42,9 @@ async function install(source, state, options, { register = identity.ensure, con
   const result = await store.install(source, state, options);
   if (['installed', 'already-installed'].includes(result.status)) {
     try {
+      options?.onPhase?.('registering');
       register(result.app, result.source || source);
+      options?.onPhase?.('shortcuts');
       configureShortcuts(state, result.app);
     } catch (error) {
       try { restorePrevious(state, previous, result.app); }

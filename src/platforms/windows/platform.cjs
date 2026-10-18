@@ -105,7 +105,8 @@ function assertStopped(apps) {
   if (processes(apps).length) throw Object.assign(new Error('Codex is running. Exit it from its menu or system tray, then retry.'), { code: 'APP_RUNNING' });
 }
 const requestQuit = apps => native('quit', { binaries: [...new Set(processes(apps).map(item => item.nativePath))] });
-const openApp = (app, { userData } = {}) => native('open', { binary: binaryPath(app), userData });
+const openApp = (app, { userData, env } = {}) => native('open', { binary: binaryPath(app), userData }, { env });
+const assertIndependentWorker = () => native('worker-context', { pid: process.pid, parentPid: process.ppid });
 function assertRuntime(node) {
   const result = execFileSync(node, ['--version'], { encoding: 'utf8', windowsHide: true, timeout: 10000 }).trim();
   const [major, minor] = result.replace(/^v/, '').split('.').map(Number);
@@ -113,4 +114,4 @@ function assertRuntime(node) {
   return node;
 }
 module.exports = { DEFAULT_STATE, nativeScript, native, requireWindows, metadata, normalizeApp, discoverApp, archivePath,
-  binaryPath, identityFiles, stamp, fingerprint, same, verify, verifySignedRuntime, processes, assertStopped, requestQuit, openApp, assertRuntime };
+  binaryPath, identityFiles, stamp, fingerprint, same, verify, verifySignedRuntime, processes, assertStopped, requestQuit, openApp, assertRuntime, assertIndependentWorker };

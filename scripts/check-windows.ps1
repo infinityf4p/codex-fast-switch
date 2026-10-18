@@ -9,4 +9,5 @@ foreach ($directory in @('src\platforms\windows', 'launchers\windows', 'scripts'
     }
 }
 Add-Type -Path (Join-Path $Root 'src\platforms\windows\quit.cs')
+Add-Type -Path (Join-Path $Root 'src\platforms\windows\worker.cs')
 Write-Host 'Windows PowerShell syntax checks passed.'

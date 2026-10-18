@@ -190,7 +190,7 @@ test('brokered update waits for approval and carries the isolated environment th
   store.saveJson(file, ticket);
   const environment = { OPENAI_API_KEY: 'must-not-inherit-from-Explorer' };
   let approved = false;
-  await handoff.install(state, 'id', token, { environment,
+  await handoff.install(state, 'id', token, { environment, assertIndependent: () => {},
     wait: async () => {
       assert.equal(store.readOptional(file).status, 'ready');
       store.saveJson(file, { ...ticket, status: 'install', userData: 'isolated-profile' });
@@ -200,6 +200,7 @@ test('brokered update waits for approval and carries the isolated environment th
       const profile = await ready();
       assert.equal(approved, true);
       assert.equal(profile, 'isolated-profile');
+      assert.equal(store.readOptional(file).workerPid, process.pid);
     },
   });
   assert.deepEqual(environment, ticket.environment);
@@ -212,11 +213,24 @@ test('closing the app before approval cancels a brokered update without installi
   t.after(() => fs.rmSync(state, { recursive: true, force: true }));
   const token = crypto.randomUUID(), file = handoff.ticketPath(state, token);
   store.saveJson(file, { id: 'id', token, parentPid: 2147483647, createdAt: Date.now(), status: 'starting', environment: {} });
-  await assert.rejects(handoff.install(state, 'id', token, { environment: {}, installCopy: async (_state, _id, { ready }) => {
+  await assert.rejects(handoff.install(state, 'id', token, { environment: {}, assertIndependent: () => {}, installCopy: async (_state, _id, { ready }) => {
     await ready();
     assert.fail('must not install before approval');
   } }), /closed before confirming/);
   assert.equal(store.readOptional(file).status, 'failed');
+});
+
+test('a package-owned helper fails before readiness so the running app cannot quit', async t => {
+  const state = fs.mkdtempSync(path.join(os.tmpdir(), 'codex-fast-handoff-'));
+  t.after(() => fs.rmSync(state, { recursive: true, force: true }));
+  const token = crypto.randomUUID(), file = handoff.ticketPath(state, token);
+  store.saveJson(file, { id: 'id', token, parentPid: process.pid, createdAt: Date.now(), status: 'starting', environment: {} });
+  await assert.rejects(handoff.install(state, 'id', token, {
+    environment: {}, assertIndependent: () => { throw new Error('helper still belongs to an app package'); },
+    installCopy: () => assert.fail('must not prepare or request quit from a package-owned worker'),
+  }), /still belongs/);
+  assert.equal(store.readOptional(file).status, 'failed');
+  assert.match(store.readOptional(file).error, /still belongs/);
 });
 
 function fixture(t) {
@@ -296,6 +310,9 @@ test('update installation waits for exit before publishing and reopening the new
     wait: async () => { events.push('exit'); exited = true; },
     installCopy: async () => {
       assert.equal(exited, true);
+      const intent = store.readOptional(updates.jobPath(f.state));
+      assert.equal(intent.reopen.userData, userData);
+      assert.equal(Object.hasOwn(intent.reopen.environment, 'OPENAI_API_KEY'), false);
       next = f.makeRecord('2');
       store.saveJson(store.activePath(f.state), next);
       events.push('install');
@@ -305,7 +322,90 @@ test('update installation waits for exit before publishing and reopening the new
   });
   assert.deepEqual(events, ['preflight', 'ready', 'exit', 'install', 'open']);
   assert.equal(store.readOptional(updates.jobPath(f.state)).status, 'installed');
+  assert.equal(store.readOptional(updates.jobPath(f.state)).reopen, null);
 });
+
+function interruptedUpdate(t) {
+  const f = fixture(t), next = { ...f.makeRecord('2'), installedAt: new Date(2000).toISOString() };
+  const job = { id: crypto.randomUUID(), fromId: f.running.id, status: 'installing', phase: 'prepared',
+    reopen: { userData: path.join(f.root, 'same profile'), environment: { CODEX_HOME: 'same-home' },
+      requestedAt: new Date(1000).toISOString() } };
+  store.saveJson(store.activePath(f.state), next);
+  store.saveJson(updates.jobPath(f.state), job);
+  return { ...f, next, job };
+}
+
+test('the monitor completes a confirmed restart after the updater disappears following publication', async t => {
+  const f = interruptedUpdate(t), calls = [];
+  store.saveJson(store.configPath(f.state), { enabled: true });
+  const options = { now: () => 3000, same: () => true, verify: () => {}, processes: () => [],
+    register: app => { assert.equal(app, f.next.app); calls.push('register'); },
+    configure: (_state, app) => { assert.equal(app, f.next.app); calls.push('shortcuts'); },
+    open: (app, options) => {
+      assert.equal(app, f.next.app);
+      assert.deepEqual(options, { userData: f.job.reopen.userData, env: f.job.reopen.environment });
+      calls.push('open');
+    } };
+  const result = await automatic.tick(f.state, {
+    recoverUpdate: state => updates.recover(state, options),
+    resolve: () => assert.fail('a published generation can finish opening without a second installation'),
+  });
+  assert.equal(result.reopened, true);
+  assert.deepEqual(calls, ['register', 'shortcuts', 'open']);
+  assert.equal(store.readOptional(updates.jobPath(f.state)).status, 'installed');
+  assert.equal(store.readOptional(updates.jobPath(f.state)).reopen, null);
+  assert.equal(updates.recover(f.state, options), null);
+  assert.deepEqual(calls, ['register', 'shortcuts', 'open']);
+});
+
+test('recovery acknowledges a manually opened new copy without activating it again', t => {
+  const f = interruptedUpdate(t);
+  const result = updates.recover(f.state, { now: () => 3000,
+    processes: () => [{ path: platform.binaryPath(f.next.app) }],
+    register: () => assert.fail('must not change a running package'),
+    open: () => assert.fail('must not reopen or steal focus'),
+  });
+  assert.equal(result.reopened, false);
+  assert.equal(store.readOptional(updates.jobPath(f.state)).status, 'installed');
+});
+
+test('normal exits, cancelled updates, expired intents and unpublished copies do not auto-open', t => {
+  const f = interruptedUpdate(t);
+  const options = { now: () => 3000, open: () => assert.fail('no confirmed pending restart') };
+  for (const job of [null, { ...f.job, reopen: null }, { ...f.job, status: 'failed' },
+    { ...f.job, status: 'installed' }, { ...f.job, status: 'waiting-for-exit' },
+    { ...f.job, reopen: { ...f.job.reopen, userData: 'relative-profile' } },
+    { ...f.job, reopen: { ...f.job.reopen, requestedAt: new Date(-3600000).toISOString() } },
+    { ...f.job, reopen: { ...f.job.reopen, requestedAt: new Date(4000).toISOString() } }]) {
+    store.saveJson(updates.jobPath(f.state), job);
+    assert.equal(updates.recover(f.state, options), null);
+  }
+  store.saveJson(updates.jobPath(f.state), f.job);
+  store.saveJson(store.activePath(f.state), f.running);
+  assert.equal(updates.recover(f.state, options), null);
+  store.saveJson(store.activePath(f.state), { ...f.next, installedAt: new Date(0).toISOString() });
+  assert.equal(updates.recover(f.state, options), null);
+});
+
+for (const failure of ['another-app', 'changed-copy', 'registration', 'activation']) {
+  test(`interrupted restart stops after ${failure} failure without repeated auto-opening`, t => {
+    const f = interruptedUpdate(t), calls = [];
+    const options = { now: () => 3000,
+      processes: () => failure === 'another-app' ? [{ path: platform.binaryPath(f.source) }] : [],
+      same: () => failure !== 'changed-copy', verify: () => {},
+      register: () => { calls.push('register'); if (failure === 'registration') throw new Error('Registration failed'); },
+      configure: () => {},
+      open: () => { calls.push('open'); throw new Error('Activation failed'); },
+    };
+    assert.throws(() => updates.recover(f.state, options));
+    assert.equal(store.readOptional(updates.jobPath(f.state)).status, 'failed');
+    assert.equal(store.readOptional(updates.jobPath(f.state)).reopen, null);
+    const completedCalls = [...calls];
+    assert.equal(updates.recover(f.state, options), null);
+    assert.deepEqual(calls, completedCalls);
+    assert.equal(calls.includes('open'), failure === 'activation');
+  });
+}
 
 test('failed updates preserve the pointer and reopen the old copy after exit', async t => {
   const f = fixture(t), opened = [];

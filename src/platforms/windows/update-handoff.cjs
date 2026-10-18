@@ -30,7 +30,8 @@ function start(state, id, token) {
   return { started: true };
 }
 
-async function install(state, id, token, { installCopy, environment = process.env, now = Date.now, wait = delay, timeoutMs = 180000 } = {}) {
+async function install(state, id, token, { installCopy, environment = process.env, now = Date.now, wait = delay, timeoutMs = 180000,
+  assertIndependent = require('./platform.cjs').assertIndependentWorker } = {}) {
   let ticket = read(state, id, token);
   // Explorer starts outside the app's process job. Restore only the captured launch environment.
   for (const key of Object.keys(environment)) delete environment[key];
@@ -40,12 +41,19 @@ async function install(state, id, token, { installCopy, environment = process.en
   const save = extra => { ticket = { ...ticket, ...extra }; store.saveJson(file, ticket); };
   const installUpdate = installCopy || require('./updates.cjs').install;
   try {
+    // The helper must survive Owl shutdown and package replacement. Refuse
+    // before readiness so the current app stays open if brokering failed.
+    assertIndependent();
     const result = await installUpdate(state, id, { ready: async () => {
       save({ status: 'ready', workerPid: process.pid });
       const deadline = now() + timeoutMs;
       while (now() < deadline) {
         const decision = read(state, id, token);
-        if (decision.status === 'install') return decision.userData;
+        if (decision.status === 'install') {
+          ticket = decision;
+          save({ workerPid: process.pid });
+          return decision.userData;
+        }
         if (decision.status === 'cancelled') throw new Error('Installation was cancelled.');
         try { process.kill(ticket.parentPid, 0); }
         catch { throw new Error('The application closed before confirming installation.'); }

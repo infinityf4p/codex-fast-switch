@@ -1,6 +1,6 @@
 param(
     [Parameter(Mandatory = $true)]
-    [ValidateSet('discover', 'store-context', 'store-catalog', 'official-feed', 'signature', 'processes', 'quit', 'open', 'identity', 'remove-identity', 'enable', 'disable', 'start-watch', 'shortcuts', 'remove-shortcuts', 'launch', 'start-update')]
+    [ValidateSet('discover', 'store-context', 'store-catalog', 'official-feed', 'signature', 'processes', 'quit', 'open', 'identity', 'remove-identity', 'enable', 'disable', 'start-watch', 'shortcuts', 'remove-shortcuts', 'launch', 'start-update', 'worker-context')]
     [string]$Action,
     [string]$Payload = 'e30='
 )
@@ -8,6 +8,19 @@ $ErrorActionPreference = 'Stop'
 $env:PSModulePath = (Join-Path $PSHOME 'Modules') + ';' + (Join-Path $env:ProgramFiles 'WindowsPowerShell\Modules')
 [Console]::OutputEncoding = New-Object System.Text.UTF8Encoding($false)
 $data = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($Payload)) | ConvertFrom-Json
+
+function Start-IndependentWorker($arguments) {
+    # Creating Shell.Application alone can launch a child of the caller.
+    # Obtain the automation object hosted by the desktop Explorer instead.
+    # https://devblogs.microsoft.com/oldnewthing/20131118-00/?p=2643
+    $shell = New-Object -ComObject Shell.Application
+    $desktopHandle = 0
+    $desktop = $shell.Windows().FindWindowSW(0, $null, 8, [ref]$desktopHandle, 1)
+    if (-not $desktopHandle -or -not $desktop -or -not $desktop.Document.Application) {
+        throw 'Windows Explorer is unavailable. Restart Explorer, then retry the update.'
+    }
+    $desktop.Document.Application.ShellExecute($data.node, $arguments, $data.state, 'open', 0)
+}
 
 function Get-AppProcesses {
     $paths = @($data.binaries)
@@ -303,14 +316,16 @@ try { switch ($Action) {
         if ($exitCode -ne 0) { throw (($output | Out-String).Trim()) }
     }
     'start-watch' {
-        $arguments = '"' + $data.worker + '" watch --state "' + $data.state + '"'
-        Start-Process -FilePath $data.node -ArgumentList $arguments -WindowStyle Hidden -WorkingDirectory $data.state | Out-Null
+        $arguments = (@($data.worker, 'watch', '--state', $data.state) | ForEach-Object { Quote-ProcessArgument $_ }) -join ' '
+        Start-IndependentWorker $arguments
     }
     'start-update' {
         $arguments = (@($data.worker, 'install', $data.state, $data.id, $data.token) | ForEach-Object { Quote-ProcessArgument $_ }) -join ' '
-        # Explorer owns this process so Owl shutdown cannot terminate the update worker.
-        $shell = New-Object -ComObject Shell.Application
-        $shell.ShellExecute($data.node, $arguments, $data.state, 'open', 0)
+        Start-IndependentWorker $arguments
+    }
+    'worker-context' {
+        Add-Type -Path (Join-Path $PSScriptRoot 'worker.cs')
+        [CodexFastWorker]::AssertIndependent([uint32]$data.pid, [uint32]$data.parentPid)
     }
     'enable' {
         $startup = [Environment]::GetFolderPath('Startup')

@@ -1,5 +1,13 @@
 # Tested builds
 
+## 2026-10-18: Windows automatic reopening and interrupted-update recovery
+
+The personal update had published app **26.1013.40934 (20770)**, but its job remained at `installing / prepared` and the handoff remained `install`. Package registration later completed; the app was manually opened about 43 minutes after publication. The exact reason the original helper stopped was not captured.
+
+A live broker probe showed that the previous `Shell.Application` call launched Node with PowerShell as its parent. The revised desktop automation call launched it under the existing Explorer process. A disposable package fixture verified that the context guard rejects a packaged process and the old launch path, accepts the new worker, and that the new worker continues after fixture unregistration and parent exit. The old worker also survived that synthetic fixture, so this is not a reproduction of the personal helper's disappearance. All temporary fixture registrations were removed; the personal app retained its main PID, start time and active generation.
+
+The suite passed **232 tests**, with **11 platform-specific skips** and **0 failures**; Windows build, PowerShell/C# checks and packaging passed. Regressions cover persisting restart intent after confirmed exit, recovery after publication, profile/environment preservation, completion without duplicate activation after manual reopening, and rejection of ordinary exits, cancelled/failed/expired requests, unpublished or modified copies and another running app. Registration and activation failures stop recovery instead of repeatedly launching. These checks do not claim a full native Update click and desktop restart on the personal app.
+
 ## 2026-10-18: Windows 20770 request compatibility
 
 The official MSIX **26.1013.4894.0**, app **26.1013.40934 (20770)**, was already installed. Revision 9 failed before requesting Quit with `Cannot uniquely recognize request logic in any declared process scope.` The new preparer includes parent/root turn metadata and changed bundled imports, while the reviewed account-type selector remains unchanged. A corresponding renderer preparer also needs the edit.

@@ -7,6 +7,45 @@ const launcher = require('./launcher.cjs');
 const { sha256 } = require('../../core/archive.cjs');
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 const jobPath = state => path.join(state, 'windows-update.json');
+const validProfile = value => typeof value === 'string' && path.isAbsolute(value) && !/[\x00-\x1f"]/u.test(value);
+
+// Called under the installation lock. Only a confirmed Update + Quit creates
+// this intent; ordinary exits and background patching must never reopen an app.
+function recover(state, { now = Date.now, same = platform.same, verify = platform.verify,
+  processes = platform.processes, open = platform.openApp, register = require('./identity.cjs').ensure,
+  configure = launcher.configure } = {}) {
+  const job = store.readOptional(jobPath(state));
+  if (!['installing', 'reopening'].includes(job?.status) || !validProfile(job.reopen?.userData)) return null;
+  const requestedAt = Date.parse(job.reopen.requestedAt);
+  if (!Number.isFinite(requestedAt) || requestedAt > now() || now() - requestedAt > 30 * 60 * 1000) return null;
+  const active = store.checkedActive(state);
+  if (!active || active.phase !== 'installed' || active.revision > store.PATCH_REVISION ||
+      active.id === job.fromId || !(Date.parse(active.installedAt) >= requestedAt)) return null;
+  const save = extra => store.saveJson(jobPath(state), { ...job, ...extra, checkedAt: new Date(now()).toISOString() });
+  try {
+    const previous = recordFor(state, job.fromId);
+    const running = processes([previous.app, active.app, active.source]);
+    const activeBinary = platform.binaryPath(active.app).toLowerCase();
+    if (running.some(item => item.path.toLowerCase() !== activeBinary)) {
+      throw new Error('Another Codex app was opened before the update could reopen.');
+    }
+    const alreadyOpen = running.length > 0;
+    if (!alreadyOpen) {
+      if (!same(active.app, active.patched)) throw new Error('The updated copy changed before reopening.');
+      verify(active.app, { patched: true });
+      register(active.app, active.source);
+      configure(state, active.app);
+      save({ status: 'reopening', app: active.app });
+      open(active.app, { userData: job.reopen.userData, env: job.reopen.environment });
+    }
+    save({ status: 'installed', app: active.app, version: active.version, build: active.build,
+      reopen: null, recovered: true, error: null });
+    return { status: 'installed', app: active.app, recovered: true, reopened: !alreadyOpen };
+  } catch (error) {
+    save({ status: 'failed', reopen: null, error: error.message });
+    throw error;
+  }
+}
 
 function recordFor(state, id) {
   if (!/^\d+-[a-f0-9-]{36}$/.test(id)) throw new Error('Invalid update generation.');
@@ -67,7 +106,7 @@ async function install(state, id, { ready, installCopy = launcher.install, resol
       verify(source);
       if (!same(running.app, running.patched)) throw new Error('The running copy changed. Run install.cmd again.');
       stopped([source]);
-      const job = { id: crypto.randomUUID(), fromId: id, status: 'preparing', startedAt: new Date(now()).toISOString() };
+      const job = { id: crypto.randomUUID(), fromId: id, workerPid: process.pid, status: 'preparing', startedAt: new Date(now()).toISOString() };
       const save = extra => { Object.assign(job, extra, { checkedAt: new Date(now()).toISOString() }); store.saveJson(jobPath(state), job); };
       let userData;
       let exited = false;
@@ -80,7 +119,7 @@ async function install(state, id, { ready, installCopy = launcher.install, resol
         await preflight(source);
         save({ status: 'waiting-for-exit' });
         userData = await ready();
-        if (typeof userData !== 'string' || !path.isAbsolute(userData) || /[\x00-\x1f"]/u.test(userData)) {
+        if (!validProfile(userData)) {
           throw new Error('Invalid application profile directory.');
         }
         const quitDeadline = now() + timeoutMs;
@@ -92,18 +131,24 @@ async function install(state, id, { ready, installCopy = launcher.install, resol
           await wait(500);
         }
         latestSource = resolve(state);
+        // Persist the user's restart request before publication. If this helper
+        // is interrupted, the monitor can finish registration and activation.
+        const environment = Object.fromEntries(Object.entries(process.env).filter(([key]) =>
+          /^(SystemRoot|WINDIR|COMSPEC|ProgramFiles(?:\(x86\))?|ProgramW6432|PATH|PATHEXT|USERPROFILE|HOMEDRIVE|HOMEPATH|HOME|APPDATA|LOCALAPPDATA|TEMP|TMP|TMPDIR|CODEX_HOME|CODEX_ELECTRON_USER_DATA_PATH|LANG|LC_ALL|OTEL_SDK_DISABLED)$/i.test(key)));
+        save({ status: 'installing', reopen: { userData, environment, requestedAt: new Date(now()).toISOString() } });
         const installed = await installCopy(latestSource, state, { onPhase: phase => save({ status: 'installing', phase }) });
         if (!['installed', 'already-installed'].includes(installed.status)) throw new Error('The updated copy was not installed.');
         stopped([latestSource, running.app]);
+        save({ status: 'reopening', app: installed.app });
         activatingApp = installed.app;
         open(installed.app, { userData });
         activatingApp = null;
-        save({ status: 'installed', app: installed.app, version: installed.version, build: installed.build, error: null });
+        save({ status: 'installed', app: installed.app, version: installed.version, build: installed.build, reopen: null, error: null });
         store.saveJson(store.statusPath(state), { status: 'installed', activeId: store.checkedActive(state)?.id,
           successStamp: stamp(latestSource), checkedAt: new Date(now()).toISOString(), error: null });
         return installed;
       } catch (error) {
-        try { save({ status: 'failed', error: error.message, code: error.code || null }); }
+        try { save({ status: 'failed', reopen: null, error: error.message, code: error.code || null }); }
         catch (recordError) { error.message += ' Could not record failure: ' + recordError.message; }
         if (exited) {
           try {
@@ -127,4 +172,4 @@ async function install(state, id, { ready, installCopy = launcher.install, resol
   }
 }
 
-module.exports = { check, checkForUpdates, install, recordFor, jobPath };
+module.exports = { check, checkForUpdates, install, recover, recordFor, jobPath };
