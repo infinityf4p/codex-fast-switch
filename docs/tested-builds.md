@@ -1,5 +1,13 @@
 # Tested builds
 
+## 2026-10-18: Windows 20770 request compatibility
+
+The official MSIX **26.1013.4894.0**, app **26.1013.40934 (20770)**, was already installed. Revision 9 failed before requesting Quit with `Cannot uniquely recognize request logic in any declared process scope.` The new preparer includes parent/root turn metadata and changed bundled imports, while the reviewed account-type selector remains unchanged. A corresponding renderer preparer also needs the edit.
+
+Revision **10** recognizes that selector and its surrounding input/output bindings in both processes. The real archive passes **40 gate cases**, including 14 executed selector checks per process. An independent ASAR copy received all four planned archive edits, including the native updater. The actual patched main and renderer preparer functions passed **32 cases** across API-key/ChatGPT/other/absent accounts, Fast/Standard, and resume/no-resume. Resume, start and steer received the expected tier; parent/root turn IDs and other request fields remained intact. The official archive's SHA-256 was unchanged. These tests use in-memory dependencies and do not claim a live model response or a desktop update-button restart.
+
+The local suite passed **224 tests**, with **11 platform-specific skips** and **0 failures**. New regressions cover unrelated request changes, changed authentication rejection, binding validation, saved defaults and policy preservation, missing/duplicate process copies, reviewed single-process layouts and native-only model recognition in a separate chunk. The personal app remained running throughout validation. Compact layout and color adapters fall back to native rendering for this build; full model-name and filled Fast-icon patches remain recognized.
+
 ## 2026-10-14: automatic official Windows installation before patch handoff
 
 Patch revision **9** passed **220 tests**, with **11 platform-specific skips** and **0 failures**, plus source, generated-script and Windows PowerShell syntax checks. New regressions cover one native click waiting for official installation before patch handoff, progress reporting, failure without quitting, numeric versions, feed identity and architecture, registered-version verification, no downgrade, shared-lock exclusion and cleanup. Real PowerShell tests validate synthetic MSIX manifests and propagate simulated Windows signature failures without installing software in CI.

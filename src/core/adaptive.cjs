@@ -90,8 +90,9 @@ function adapt(source, recipes) {
       const hasRecipeMarker = recipes.some(item => item.requiredMarker && body.includes(item.requiredMarker));
       if (!hasRecipeMarker && !body.includes('fast_mode') && !body.includes('serviceTierForRequest') && !body.includes('readServiceTier')) return;
       const normalized = shape(fn);
-      let recipe;
-      for (const item of recipes) {
+      const requestContract = recipes.find(item => item.contract === 'submission-service-tier');
+      let recipe = requestContract ? require('./request-gate.cjs').recognize(fn, requestContract, { shape, nodePath }) : null;
+      for (const item of recipe ? [] : recipes) {
         const variant = [item, ...(item.compatibleFingerprints || [])]
           .find(candidate => candidate.fingerprint === normalized.fingerprint);
         if (variant) { recipe = { ...item, ...variant }; break; }
@@ -114,7 +115,8 @@ function adapt(source, recipes) {
     const edit = edits.find(item => item.fn === match.fn);
     match.patchedFunction = original.slice(0, edit.start - match.fn.start) + edit.value + original.slice(edit.end - match.fn.start);
     const patchedFn = parse(match.patchedFunction).body[0];
-    if (shape(patchedFn).fingerprint !== match.recipe.patchedFingerprint) throw new Error('Unexpected transformed function.');
+    const verified = match.recipe.fingerprintPath ? at(patchedFn, match.recipe.fingerprintPath) : patchedFn;
+    if (shape(verified).fingerprint !== match.recipe.patchedFingerprint) throw new Error('Unexpected transformed function.');
   }
   return { patched, matches };
 }
@@ -124,6 +126,9 @@ async function validateGates(matches) {
   const request = matches.find(item => item.recipe.kind === 'request');
   const saved = matches.find(item => item.recipe.kind === 'saved-request');
   const results = [];
+  for (const match of matches.filter(item => item.recipe.validation === 'submission-service-tier')) {
+    results.push(...await require('./request-gate.cjs').validate(match, { parse, at }));
+  }
   for (const auth of ['apikey', 'chatgpt', null]) {
     for (const blocked of [false, true]) {
       for (const loading of [false, true]) {
@@ -137,7 +142,7 @@ async function validateGates(matches) {
         };
         const allowed = auth !== null && !blocked;
         for (const [match, expected] of [[ui, allowed && !loading], [request, allowed], ...(saved ? [[saved, allowed]] : [])]) {
-          if (match.recipe.skipValidation) continue;
+          if (match.recipe.skipValidation || match.recipe.validation === 'submission-service-tier') continue;
           const globals = {};
           for (const item of match.recipe.environment) globals[match.names[item.index]] = stubs[item.stub];
           globals.client = { query: { setData() {} }, requestClient: {}, logger: {}, getHostId: () => 'local',
@@ -231,7 +236,8 @@ async function planArchive(archive, recipes = defaultRecipes, iconRecipe = recip
     if (!source.includes('fast_mode') && !source.includes('serviceTierForRequest') && !source.includes('readServiceTier') &&
       !((iconRecipe || compactRecipe !== null) && source.includes('serviceTierIconKind')) &&
       !(compactColors && source.includes('data-composer-navigation-target')) &&
-      !(pickerRecipes && source.includes('stripGptPrefix'))) continue;
+      !(pickerRecipes && source.includes('stripGptPrefix')) &&
+      !scopedRecipes.some(recipe => recipe.requiredMarker && source.includes(recipe.requiredMarker))) continue;
     const result = adapt(source, scopedRecipes);
     const icon = scope === 'webview' && iconRecipe && source.includes('serviceTierIconKind')
       ? appearance('fast-icon', () => adaptFastIcon(result.patched, iconRecipe)) : null;
@@ -248,8 +254,8 @@ async function planArchive(archive, recipes = defaultRecipes, iconRecipe = recip
     pickerMatches.push(...(picker?.matches ?? []));
     const pickerChanges = picker?.matches.filter(match => match.changed).map(match => match.kind) ?? [];
     const changedMatches = result.matches.filter(match => !match.recipe.native);
-    if (!changedMatches.length && !icon?.changed && !compact?.changed && !pickerChanges.length && !colors?.changed) continue;
     allMatches.push(...result.matches.map(match => ({ ...match, scope })));
+    if (!changedMatches.length && !icon?.changed && !compact?.changed && !pickerChanges.length && !colors?.changed) continue;
     targets.push({ entry, sourceSha256: sha256(bytes), patched: Buffer.from(colors?.patched ?? picker?.patched ?? compact?.patched ?? icon?.patched ?? result.patched),
       kinds: [...changedMatches.map(item => item.recipe.kind), ...(icon?.changed ? ['fast-icon'] : []),
         ...(compact?.changed ? ['compact-model-control'] : []), ...pickerChanges, ...(colors?.changed ? ['compact-colors'] : [])] });
@@ -258,7 +264,12 @@ async function planArchive(archive, recipes = defaultRecipes, iconRecipe = recip
     ...allMatches.flatMap(match => match.recipe.requires || [])]);
   for (const kind of new Set([...required, ...allMatches.map(match => match.recipe.kind)])) {
     const kindRecipes = recipes.filter(recipe => recipe.kind === kind);
-    if (kindRecipes.some(recipe => recipe.anyScope)) {
+    const matchedRecipes = allMatches.filter(item => item.recipe.kind === kind).map(item => item.recipe);
+    const selectedRecipes = matchedRecipes.length ? matchedRecipes : kindRecipes;
+    const needsBoth = selectedRecipes.some(recipe => recipe.validation === 'submission-service-tier' && !recipe.allowsSingleScope);
+    // Retain reviewed older one-process layouts; newly recognized preparers
+    // require both main and renderer copies, each unique in its scope.
+    if (!needsBoth && selectedRecipes.some(recipe => recipe.anyScope || recipe.allowsSingleScope)) {
       if (allMatches.filter(item => item.recipe.kind === kind).length !== 1) {
         throw new Error(`Cannot uniquely recognize ${kind} logic in any declared process scope.`);
       }

@@ -54,6 +54,7 @@
   },
   {
     "kind": "request",
+    "contract": "submission-service-tier",
     "requiredMarker": "serviceTier",
     "scopes": ["webview", "main"],
     "anyScope": true,
@@ -130,7 +131,13 @@
     "requiredMarker": "additionalAvailableModels",
     "scopes": ["webview"],
     "fingerprint": "8e79f1d8bb47b8d7c8a7db1c588ee8a13a968c0b8e529ea23fff0d302cb475a4",
-    "patchedFingerprint": "8e79f1d8bb47b8d7c8a7db1c588ee8a13a968c0b8e529ea23fff0d302cb475a4"
+    "patchedFingerprint": "8e79f1d8bb47b8d7c8a7db1c588ee8a13a968c0b8e529ea23fff0d302cb475a4",
+    "compatibleFingerprints": [
+      {
+        "fingerprint": "a2f66206477fe1b0902c3d2ddd799969cea8634fac864f027c3af799792fbed3",
+        "patchedFingerprint": "a2f66206477fe1b0902c3d2ddd799969cea8634fac864f027c3af799792fbed3"
+      }
+    ]
   },
   {
     "kind": "saved-request",
