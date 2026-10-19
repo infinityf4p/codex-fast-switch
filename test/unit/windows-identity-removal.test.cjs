@@ -152,3 +152,37 @@ test('same-generation identity refresh never removes the registration', windows,
   assert.equal(result.calls.some(call => call.action === 'remove'), false);
   assert.equal(result.calls.filter(call => call.action === 'add').length, 1);
 });
+
+test('switching generations retains enabled and user-disabled native startup choices', windows, t => {
+  const f = fixture(t);
+  for (const State of [0, 1, 2]) {
+    const startup = { State, UserEnabledStartupOnce: 1 };
+    const result = f.run({ action: 'identity', payload: { name: 'CodexFast.Switch', version: '1.0.0.1', root: f.roots[1] },
+      packages: [f.pkg(f.roots[0])], startup });
+    assert.equal(result.status, 0, JSON.stringify(result.result));
+    assert.equal(result.result.installLocation, f.roots[1]);
+    assert.deepEqual(result.startup, startup);
+  }
+});
+
+test('failed registration restores the old native startup choice along with its package', windows, t => {
+  const f = fixture(t);
+  const startup = { State: 2, UserEnabledStartupOnce: 1 };
+  const result = f.run({ action: 'identity', payload: { name: 'CodexFast.Switch', version: '1.0.0.1', root: f.roots[1] },
+    packages: [f.pkg(f.roots[0])], startup, failAddAt: [1] });
+  assert.equal(result.status, 1);
+  assert.doesNotMatch(result.result.error.message, /recovery failed/);
+  assert.equal(result.packages[0].InstallLocation, f.roots[0]);
+  assert.deepEqual(result.startup, startup);
+});
+
+test('native startup restoration respects Windows policy and leaves new installations at their default', windows, t => {
+  const f = fixture(t);
+  for (const [startup, registeredStartup] of [[{ State: 2 }, { State: 3 }], [{ State: 1 }, { State: 4 }], [{ State: 3 }, { State: 3 }], [null, { State: 0 }]]) {
+    const result = f.run({ action: 'identity', payload: { name: 'CodexFast.Switch', version: '1.0.0.1', root: f.roots[1] },
+      packages: startup ? [f.pkg(f.roots[0])] : [], startup, registeredStartup });
+    assert.equal(result.status, 0, JSON.stringify(result.result));
+    assert.deepEqual(result.startup, registeredStartup);
+    assert.equal(result.calls.some(call => call.action === 'startup'), false);
+  }
+});

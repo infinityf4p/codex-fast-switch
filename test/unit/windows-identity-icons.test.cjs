@@ -66,6 +66,25 @@ test('unchanged identity resources are not rewritten and do not request registra
   });
 });
 
+test('new copies use the saved opt-in for native background login activation; other installations stay disabled', t => {
+  const f = fixture(t);
+  const state = path.join(f.temporary, 'selected state');
+  fs.mkdirSync(state);
+  const configuration = path.join(state, 'windows.json');
+  for (const [id, setting, enabled] of [['first', undefined, false], ['second', true, true], ['third', true, true], ['fourth', false, false]]) {
+    if (setting !== undefined) fs.writeFileSync(configuration, JSON.stringify({ launchAtLogin: setting }));
+    const app = path.join(state, 'versions', id, 'app');
+    fs.mkdirSync(app, { recursive: true });
+    identity.ensure(app, f.source, { run(_action, payload) {
+      const xml = fs.readFileSync(path.join(payload.root, 'AppxManifest.xml'), 'utf8');
+      assert.match(xml, /xmlns:uap5="http:\/\/schemas\.microsoft\.com\/appx\/manifest\/uap\/windows10\/5"/);
+      assert.match(xml, /Category="windows\.startupTask" Executable="app\\ChatGPT\.exe"/);
+      assert.ok(xml.includes(`<uap5:StartupTask TaskId="App" Enabled="${enabled}" DisplayName="Codex Fast" />`));
+      return { ...f.registered, installLocation: payload.root };
+    } });
+  }
+});
+
 test('changed base and theme artwork replace stale bytes before the package is refreshed', t => {
   const f = fixture(t);
   identity.ensure(f.app, f.source, { run: () => f.registered });

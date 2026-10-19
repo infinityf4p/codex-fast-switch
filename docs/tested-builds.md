@@ -8,6 +8,14 @@ The real archive passed recognition, including **28 executed request-selector ca
 
 Source checks and the local suite passed **221 tests**, with **22 platform-specific skips** and **0 failures**. These checks validate patch preparation and signing; the running personal app was not replaced or restarted, and this run did not test a live UI, provider response or complete official update cycle.
 
+## 2026-10-19: Windows native background login startup
+
+App **26.1013.40934 (20770)** recognizes Windows `startup-task` activation as a background launch, keeps its window hidden and ignores duplicate startup activation. The local package now declares that optional task. The Windows startup choice is retained across generation replacement and registration recovery, with policy-controlled states left to Windows. New installations default to disabled.
+
+The personal official package's enabled startup entry was disabled, and the local installation opted in. Windows accepted deferred registration of the revised local manifest while the app was running; the active package remained at the previous registration version, so completion awaits normal app exit. The app's process IDs and start times were unchanged. This does not claim a completed logout/login or a visual tray-start test.
+
+The suite passed **236 tests**, with **11 platform-specific skips** and **0 failures**. Windows build and PowerShell syntax checks passed. The real native helper runs against mocked package and registry operations to cover enabled/disabled preference retention, registration rollback, policy preservation and first-install defaults.
+
 ## 2026-10-18: Windows automatic reopening and interrupted-update recovery
 
 The personal update had published app **26.1013.40934 (20770)**, but its job remained at `installing / prepared` and the handoff remained `install`. Package registration later completed; the app was manually opened about 43 minutes after publication. The exact reason the original helper stopped was not captured.

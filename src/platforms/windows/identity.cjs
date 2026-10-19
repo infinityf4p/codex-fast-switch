@@ -9,21 +9,22 @@ const { native } = require('./platform.cjs');
 // opened through that identity instead of by executable path.
 const PACKAGE_NAME = 'CodexFast.Switch';
 const PUBLISHER = 'CN=CodexFastLocal';
-const PACKAGE_VERSION = '1.0.0.0';
+const PACKAGE_VERSION = '1.0.0.1';
 const APP_ID = 'App';
 const APP_DIRECTORY = 'app';
 const EXECUTABLE = 'ChatGPT.exe';
 const IMAGES = ['icon.png', 'Square44x44Logo.png', 'Square150x150Logo.png'];
 const assetsPath = source => path.join(path.dirname(source), 'assets');
 
-function manifest(arch) {
+function manifest(arch, { launchAtLogin = false } = {}) {
   return `<?xml version="1.0" encoding="utf-8"?>
 <Package
   xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
   xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
+  xmlns:uap5="http://schemas.microsoft.com/appx/manifest/uap/windows10/5"
   xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
   xmlns:desktop6="http://schemas.microsoft.com/appx/manifest/desktop/windows10/6"
-  IgnorableNamespaces="uap rescap desktop6">
+  IgnorableNamespaces="uap uap5 rescap desktop6">
   <Identity Name="${PACKAGE_NAME}" Publisher="${PUBLISHER}" Version="${PACKAGE_VERSION}" ProcessorArchitecture="${arch}" />
   <Properties>
     <DisplayName>Codex Fast</DisplayName>
@@ -46,6 +47,11 @@ function manifest(arch) {
   <Applications>
     <Application Id="${APP_ID}" Executable="${APP_DIRECTORY}\\${EXECUTABLE}" EntryPoint="Windows.FullTrustApplication">
       <uap:VisualElements DisplayName="Codex Fast" Description="Codex Fast" Square44x44Logo="assets\\Square44x44Logo.png" Square150x150Logo="assets\\Square150x150Logo.png" BackgroundColor="#3143FF" />
+      <Extensions>
+        <uap5:Extension Category="windows.startupTask" Executable="${APP_DIRECTORY}\\${EXECUTABLE}" EntryPoint="Windows.FullTrustApplication">
+          <uap5:StartupTask TaskId="${APP_ID}" Enabled="${launchAtLogin ? 'true' : 'false'}" DisplayName="Codex Fast" />
+        </uap5:Extension>
+      </Extensions>
     </Application>
   </Applications>
 </Package>
@@ -112,13 +118,21 @@ function prepareImages(root, source) {
   }
   return { changed, indexed };
 }
-function ensure(app, source, { run = native } = {}) {
+function loginPreference(app) {
+  const versions = path.dirname(path.dirname(app));
+  if (path.basename(versions).toLowerCase() !== 'versions') return false;
+  const configuration = path.join(path.dirname(versions), 'windows.json');
+  if (!fs.existsSync(configuration)) return false;
+  return JSON.parse(fs.readFileSync(configuration, 'utf8')).launchAtLogin === true;
+}
+
+function ensure(app, source, { run = native, launchAtLogin = loginPreference(app) } = {}) {
   const root = path.dirname(app);
   const pendingPath = path.join(root, '.identity-refresh-pending');
   const pending = info(pendingPath);
   if (pending && (pending.isSymbolicLink() || !pending.isFile())) throw new Error('The local package refresh marker is redirected.');
   const manifestPath = path.join(root, 'AppxManifest.xml');
-  const xml = manifest(architecture(app));
+  const xml = manifest(architecture(app), { launchAtLogin });
   const manifestChanged = writeChanged(manifestPath, Buffer.from(xml));
   const icons = prepareImages(root, source);
   const refresh = !!pending || manifestChanged || icons.changed;

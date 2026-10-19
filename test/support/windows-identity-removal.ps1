@@ -6,14 +6,55 @@ $global:FastIdentityCalls = @()
 $global:FastIdentityGetCount = 0
 $global:FastIdentityAddCount = 0
 $global:FastIdentityPackages = @($global:FastIdentityFixture.packages)
+$global:FastIdentityStartup = $global:FastIdentityFixture.startup
 
 function global:Save-FastIdentityTrace {
-    $value = @{ calls = @($global:FastIdentityCalls); packages = @($global:FastIdentityPackages) } | ConvertTo-Json -Depth 12 -Compress
+    $value = @{ calls = @($global:FastIdentityCalls); packages = @($global:FastIdentityPackages); startup = $global:FastIdentityStartup } | ConvertTo-Json -Depth 12 -Compress
     [IO.File]::WriteAllText($global:FastIdentityTrace, $value)
 }
 
 # Every package and process operation is replaced before invoking the real
-# native script. These fixtures never enumerate or change Windows packages.
+# native script. These fixtures never enumerate or change Windows packages or
+# startup registry entries.
+function global:Assert-FastIdentityStartupKey([string]$key) {
+    $expected = 'HKCU:\Software\Classes\Local Settings\Software\Microsoft\Windows\CurrentVersion\AppModel\SystemAppData\CodexFast.Switch_fixture\App'
+    if ($key -cne $expected) { throw 'Unexpected startup registry scope.' }
+}
+
+function global:Test-Path {
+    [CmdletBinding()]
+    param([string]$LiteralPath)
+    if ($LiteralPath.StartsWith('HKCU:')) {
+        Assert-FastIdentityStartupKey $LiteralPath
+        return $null -ne $global:FastIdentityStartup
+    }
+    Microsoft.PowerShell.Management\Test-Path -LiteralPath $LiteralPath
+}
+
+function global:Get-ItemProperty {
+    [CmdletBinding()]
+    param([string]$LiteralPath)
+    Assert-FastIdentityStartupKey $LiteralPath
+    $global:FastIdentityStartup
+}
+
+function global:New-Item {
+    [CmdletBinding()]
+    param([string]$Path, [switch]$Force)
+    Assert-FastIdentityStartupKey $Path
+    $global:FastIdentityStartup = [pscustomobject]@{}
+}
+
+function global:New-ItemProperty {
+    [CmdletBinding()]
+    param([string]$LiteralPath, [string]$Name, [int]$Value, [string]$PropertyType, [switch]$Force)
+    Assert-FastIdentityStartupKey $LiteralPath
+    if ($Name -notin @('State', 'UserEnabledStartupOnce') -or $PropertyType -ne 'DWord') { throw 'Unexpected startup value.' }
+    $global:FastIdentityCalls += @{ action = 'startup'; name = $Name; value = $Value }
+    $global:FastIdentityStartup | Add-Member -MemberType NoteProperty -Name $Name -Value $Value -Force
+    Save-FastIdentityTrace
+}
+
 function global:Get-AppxPackage {
     [CmdletBinding()]
     param([string]$Name, [switch]$AllUsers, [string]$User)
@@ -34,6 +75,7 @@ function global:Remove-AppxPackage {
     if ($global:FastIdentityFixture.failRemove) { throw 'Mock package removal failed.' }
     if (-not $global:FastIdentityFixture.retainAfterRemove) {
         $global:FastIdentityPackages = @($global:FastIdentityPackages | Where-Object { $_.PackageFullName -cne $Package })
+        $global:FastIdentityStartup = $null
     }
     Save-FastIdentityTrace
 }
@@ -48,8 +90,12 @@ function global:Add-AppxPackage {
         throw ('Mock package registration failed #' + $global:FastIdentityAddCount + '.')
     }
     $directory = [IO.Path]::GetDirectoryName($Register)
+    [xml]$manifest = [IO.File]::ReadAllText($Register)
+    $global:FastIdentityStartup = if ($null -ne $global:FastIdentityFixture.registeredStartup) {
+        $global:FastIdentityFixture.registeredStartup
+    } else { [pscustomobject]@{ State = 0; UserEnabledStartupOnce = 0 } }
     $global:FastIdentityPackages = @([pscustomobject]@{
-        Name = 'CodexFast.Switch'; Publisher = 'CN=CodexFastLocal'; Status = 'Ok'; Version = '1.0.0.0';
+        Name = 'CodexFast.Switch'; Publisher = 'CN=CodexFastLocal'; Status = 'Ok'; Version = [string]$manifest.Package.Identity.Version;
         InstallLocation = $directory; PackageFullName = ('registered-' + [IO.Path]::GetFileName($directory));
         PackageFamilyName = 'CodexFast.Switch_fixture'
     })

@@ -102,6 +102,37 @@ function Test-LocalIdentityPackage($package, [string[]]$roots) {
         $package.InstallLocation -and $roots -icontains (Get-LocalIdentityPath $package.InstallLocation)
 }
 
+function Get-LocalStartupPath($package) {
+    if ($package.PackageFamilyName -notmatch '^CodexFast\.Switch_[a-z0-9]+$') {
+        throw 'Unexpected local startup package family.'
+    }
+    return 'HKCU:\Software\Classes\Local Settings\Software\Microsoft\Windows\CurrentVersion\AppModel\SystemAppData\' + $package.PackageFamilyName + '\App'
+}
+
+function Get-LocalStartupPreference($package) {
+    $key = Get-LocalStartupPath $package
+    if (-not (Test-Path -LiteralPath $key)) { return $null }
+    $entry = Get-ItemProperty -LiteralPath $key -ErrorAction Stop
+    # Keep the user's enabled/disabled choice across removal and registration.
+    # Policy-controlled states (3 and 4) remain Windows' responsibility.
+    if ($null -eq $entry.State -or @(0, 1, 2) -notcontains $entry.State) { return $null }
+    $preference = @{ State = [int]$entry.State }
+    if ($null -ne $entry.UserEnabledStartupOnce) { $preference.UserEnabledStartupOnce = [int]$entry.UserEnabledStartupOnce }
+    return $preference
+}
+
+function Restore-LocalStartupPreference($package, $preference) {
+    if ($null -eq $preference) { return }
+    $key = Get-LocalStartupPath $package
+    if (Test-Path -LiteralPath $key) {
+        $entry = Get-ItemProperty -LiteralPath $key -ErrorAction Stop
+        if (@(3, 4) -contains $entry.State) { return }
+    } else { [void](New-Item -Path $key -Force -ErrorAction Stop) }
+    foreach ($name in $preference.Keys) {
+        [void](New-ItemProperty -LiteralPath $key -Name $name -Value $preference[$name] -PropertyType DWord -Force -ErrorAction Stop)
+    }
+}
+
 try { switch ($Action) {
     'official-feed' {
         [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
@@ -215,8 +246,9 @@ try { switch ($Action) {
             }
             $oldRoot = Get-LocalIdentityGeneration $package.InstallLocation $state
             Assert-LocalIdentityRecord $oldRoot
-            @{ package = $package; root = $oldRoot }
+            @{ package = $package; root = $oldRoot; startup = (Get-LocalStartupPreference $package) }
         })
+        $startup = ($previous | Where-Object { $null -ne $_.startup } | Select-Object -First 1).startup
         $current = @($previous | Where-Object { $_.package.Status -eq 'Ok' -and
             $_.package.Version.ToString() -eq $data.version -and $_.root -ieq $root })
         if (-not $current.Count) {
@@ -241,6 +273,7 @@ try { switch ($Action) {
                     $_.Status -eq 'Ok' -and (Test-LocalIdentityPackage $_ @($root))
                 })
                 if ($registered.Count -ne 1) { throw 'The local package identity could not be registered at the selected generation.' }
+                Restore-LocalStartupPreference $registered[0] $startup
             } catch {
                 $failure = $_.Exception.Message
                 $recoveryErrors = @()
@@ -261,6 +294,7 @@ try { switch ($Action) {
                                 $_.Status -eq 'Ok' -and (Test-LocalIdentityPackage $_ @($old.root))
                             })
                             if (-not $restored.Count) { throw 'The previous package registration was not restored.' }
+                            Restore-LocalStartupPreference $restored[0] $old.startup
                         } catch { $recoveryErrors += $_.Exception.Message }
                     }
                 }
@@ -273,6 +307,7 @@ try { switch ($Action) {
                 $_.Status -eq 'Ok' -and (Test-LocalIdentityPackage $_ @($root))
             })
             if ($registered.Count -ne 1) { throw 'The local package identity could not be registered at the selected generation.' }
+            Restore-LocalStartupPreference $registered[0] $startup
         }
         @{ packageFullName = $registered.PackageFullName; packageFamilyName = $registered.PackageFamilyName;
             installLocation = $registered.InstallLocation } | ConvertTo-Json -Compress

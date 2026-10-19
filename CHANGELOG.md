@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Register an optional native Windows login task for Codex Fast. Supported runtimes start in the tray through `startup-task` activation. Preserve the user's enabled/disabled choice across copy replacements and registration recovery; default to disabled for new installations and remove the entry with the local package on uninstall.
+
 - Keep Windows update workers independent through the desktop Explorer automation object and verify their parent and package context before allowing Quit. Persist confirmed restart requests so the monitor can finish registration and reopen a published copy after an interrupted helper, preserving the profile and recognizing an already reopened app. Normal exits, cancelled/failed updates and requests older than 30 minutes do not trigger recovery. Include registration, shortcut and reopening phases in update status.
 
 - Windows patch revision 10 supports app 26.1013.40934 (20770). Recognize the reviewed service-tier selector and verify its input, saved-default delegate and resume/start/steer outputs independently of unrelated request fields or bundled import names. Patch both main and renderer preparers, retain reviewed older single-process layouts, and execute authentication/Standard/Fast checks for each modern selector. Recognize the new app's existing selected-model catalog support without rewriting it. Native-only model recognition now works in a separate chunk. Changed compact layout and colors retain native rendering while model names and the filled Fast icon remain applied.
