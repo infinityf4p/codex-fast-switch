@@ -1,5 +1,13 @@
 # Tested builds
 
+## 2026-10-19: macOS 20770 compatibility
+
+The official app **26.1013.40934 (20770)** was unpatched after the installed October 11 worker rejected its request preparer. The current shared request adapter recognizes both process scopes; the remaining macOS failure was the changed compact model control. Its reviewed fingerprint now selects the existing native picker path, retaining the separate full-model-name and filled Fast-icon edits.
+
+The real archive passed recognition, including **28 executed request-selector cases** across the main and renderer processes. A temporary copy received all four planned ASAR entries, including the update hook. Each resulting entry matched its planned bytes and marker hash; `codesign --verify --deep --strict` passed, and the embedded Electron integrity slot was updated. The candidate reused the existing signing identity, and the fixed storage helper's record was unchanged. The official source remained unchanged and the temporary candidate was removed.
+
+Source checks and the local suite passed **221 tests**, with **22 platform-specific skips** and **0 failures**. These checks validate patch preparation and signing; the running personal app was not replaced or restarted, and this run did not test a live UI, provider response or complete official update cycle.
+
 ## 2026-10-18: Windows automatic reopening and interrupted-update recovery
 
 The personal update had published app **26.1013.40934 (20770)**, but its job remained at `installing / prepared` and the handoff remained `install`. Package registration later completed; the app was manually opened about 43 minutes after publication. The exact reason the original helper stopped was not captured.
