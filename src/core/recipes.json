@@ -6,6 +6,21 @@
     "patchedFingerprint": "4d468ee7d2f1ea619af3327bfe14b689ebfdc6768df584c67548df808dbcef55",
     "compatibleFingerprints": [
       {
+        "fingerprint": "cdcf59d8807f53e89956e0174abfedc2a79900bfa557bacf120e85f8e234a169",
+        "patchedFingerprint": "90bc9d8bb7c3fbd9e0b9b6fea2463615e141bfe79bc3c4daf456c550a2daad55",
+        "path": ["body", "body", 0, "declarations", 4, "init"],
+        "validationProperty": "serviceTierAccess",
+        "environment": [
+          { "index": 1, "stub": "memo" },
+          { "index": 3, "stub": "value" },
+          { "index": 4, "stub": "host" },
+          { "index": 8, "stub": "auth" },
+          { "index": 14, "stub": "value" },
+          { "index": 15, "stub": "query" },
+          { "index": 18, "stub": "serviceTier" }
+        ]
+      },
+      {
         "fingerprint": "271688f0115f49393ddc23bcb78988f5b8903f57d881ac96179728466b4ca2ec",
         "patchedFingerprint": "c807b7a9ba3231e2f70b1b335f9fcbf9e04565e7ff896dd05f612a7fa6d58501"
       },
@@ -153,6 +168,10 @@
       {
         "fingerprint": "4a43769d3384fb42e460403e7c539075782f16637130ce8a962f2966b71fff07",
         "patchedFingerprint": "4a43769d3384fb42e460403e7c539075782f16637130ce8a962f2966b71fff07"
+      },
+      {
+        "fingerprint": "e372fd64213421c2642c465767b2c1b2b7884f1af1c3177a754c94d3c1951a65",
+        "patchedFingerprint": "e372fd64213421c2642c465767b2c1b2b7884f1af1c3177a754c94d3c1951a65"
       }
     ]
   },

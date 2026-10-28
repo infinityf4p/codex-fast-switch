@@ -163,6 +163,7 @@ async function validateGates(matches) {
           memo: { c: count => Array(count).fill(Symbol.for('react.memo_cache_sentinel')) },
           host: () => 'local', value: {}, auth: () => ({ authMethod: auth, isLoading: loading }),
           query: () => ({ data: requirements, isPending: false }),
+          serviceTier: value => value?.requirements?.featureRequirements?.fast_mode === true,
           readAuth: async () => auth, readRequirements: async () => requirements,
           savedTier: async (_client, _logger, _model, allowed) => await allowed() && !blocked,
         };
@@ -176,9 +177,12 @@ async function validateGates(matches) {
             getAccount: async () => ({ account: auth == null ? null : { type: auth === 'apikey' ? 'apiKey' : auth } }) };
           globals.adapters = { runtime: { isCopilotApiAvailable: async () => false }, storage: { readGlobalState: async () => false } };
           const context = vm.createContext(globals);
-          const invoke = match.recipe.kind === 'ui' ? '({hostId:"local"}).isServiceTierAllowed' :
+          const invoke = match.recipe.kind === 'ui' ? '({hostId:"local"})' :
             match.recipe.kind === 'saved-request' ? '(client,adapters,()=>{},()=>{}).readServiceTier("model")' : '(client,"local")';
-          const result = await vm.runInContext(`(${match.patchedFunction})${invoke}`, context, { timeout: 1000 });
+          const rawResult = await vm.runInContext(`(${match.patchedFunction})${invoke}`, context, { timeout: 1000 });
+          const result = match.recipe.kind === 'ui'
+            ? (rawResult?.[match.recipe.validationProperty ?? 'isServiceTierAllowed'] ?? false)
+            : rawResult;
           if (result !== expected) throw new Error(`Gate verification failed: ${match.recipe.kind}, ${auth}, ${blocked}, ${loading}`);
         }
         results.push({ auth, blocked, loading, passed: true });
