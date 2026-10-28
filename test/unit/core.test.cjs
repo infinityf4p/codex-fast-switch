@@ -121,6 +121,24 @@ test('reviewed gate variants can allow a specific provider account type', () => 
   assert.match(result.patched, /account\?\.type === "chatgpt"\|\|account\?\.type===\"apiKey\"/);
 });
 
+test('nested provider predicates keep reviewed methods while adding API-key access', () => {
+  for (const [kind, marker, value] of [['ui', 'serviceTierAccess', 'apikey'], ['request', 'serviceTier', 'apiKey'], ['saved-request', 'readServiceTier', 'apiKey']]) {
+    const source = `function current(account){const ${marker}=true;return account?.type === "chatgpt" || account?.type === "amazonBedrock";}`;
+    const fn = adaptive.parse(source).body[0];
+    const target = fn.body.body[1].argument;
+    const expected = source.replace('account?.type === "chatgpt" || account?.type === "amazonBedrock"',
+      `(account?.type === "chatgpt" || account?.type === "amazonBedrock"||account?.type===\"${value}\")`);
+    const recipe = { kind, requiredMarker: marker, allowValues: [value],
+      fingerprint: adaptive.shape(fn).fingerprint,
+      patchedFingerprint: adaptive.shape(adaptive.parse(expected).body[0]).fingerprint,
+      path: adaptive.nodePath(fn, target), environment: [] };
+    const result = adaptive.adapt(source, [recipe]);
+    assert.equal(result.matches.length, 1);
+    assert.ok(result.patched.includes('amazonBedrock'));
+    assert.ok(result.patched.includes(`account?.type===\"${value}\"`));
+  }
+});
+
 test('reviewed nested model settings preserve host options and older model queries', () => {
   const source = 'function models(host,current){const {modelSettings}=current;const serviceTierForRequest=modelSettings.serviceTier;return getModels(host);}';
   const fn = adaptive.parse(source).body[0];

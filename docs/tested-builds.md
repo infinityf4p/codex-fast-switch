@@ -1,5 +1,13 @@
 # Tested builds
 
+## 2026-10-28: macOS 22391 compatibility
+
+The official app **26.1023.50603 (22391)** initially failed recognition after its provider predicates, request selector, model catalog and compact control changed. The reviewed adapter now accepts the added `amazonBedrock` branch in both request process scopes, recognizes the native model catalog and compact layout, and keeps the existing model-name, Default preset and filled Fast-icon transforms separate.
+
+The real archive passed recognition, including **28 executed request-selector cases** across the main and renderer processes. A temporary candidate received four planned ASAR edits, passed `codesign --verify --deep --strict`, reused the existing local signing identity, and disabled the rewritten Electron integrity slot. The official app and storage helper remained unchanged, and the candidate was removed after validation.
+
+Source checks and the local suite passed **248 tests**, with **25 platform-specific skips** and **0 failures**. This run validates recognition, patch preparation and signing; it does not claim a live UI, provider response or complete official update cycle.
+
 ## 2026-10-19: macOS 20770 compatibility
 
 The official app **26.1013.40934 (20770)** was unpatched after the installed October 11 worker rejected its request preparer. The current shared request adapter recognizes both process scopes; the remaining macOS failure was the changed compact model control. Its reviewed fingerprint now selects the existing native picker path, retaining the separate full-model-name and filled Fast-icon edits.

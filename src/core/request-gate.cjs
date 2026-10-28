@@ -23,14 +23,16 @@ function recognize(fn, recipe, { shape, nodePath }) {
     return found.length === 1 ? found[0].init : null;
   };
   const selectors = [];
+  const selectorVariants = [{ fingerprint: original, patchedFingerprint: patched }, ...(recipe.selectorVariants || [])];
   for (const declaration of declarations) {
     const all = declaration.init?.type === 'AwaitExpression' ? declaration.init.argument : null;
     if (declaration.id.type !== 'ArrayPattern' || declaration.id.elements[0]?.type !== 'Identifier' ||
         all?.type !== 'CallExpression' || !member(all.callee, 'all') || !same(all.callee.object, 'Promise') ||
         all.arguments.length !== 1 || all.arguments[0].type !== 'ArrayExpression') continue;
     const call = all.arguments[0].elements[0];
-    if (call?.type !== 'CallExpression' || call.arguments.length || call.callee.type !== 'ArrowFunctionExpression' ||
-        shape(call.callee).fingerprint !== original) continue;
+    const selectorFingerprint = call?.callee?.type === 'ArrowFunctionExpression' ? shape(call.callee).fingerprint : null;
+    const selectorVariant = selectorVariants.find(variant => variant.fingerprint === selectorFingerprint);
+    if (call?.type !== 'CallExpression' || call.arguments.length || call.callee.type !== 'ArrowFunctionExpression' || !selectorVariant) continue;
     const selector = call.callee, statements = selector.body.body;
     const options = statements[0].test.left.name;
     const saved = statements[0].consequent.argument;
@@ -54,7 +56,8 @@ function recognize(fn, recipe, { shape, nodePath }) {
         !same(property(resumeInput, 'conversationId'), prepare.params[0].name) ||
         !same(property(request, 'threadId'), prepare.params[0].name)) continue;
     selectors.push({ ...recipe, anyScope: false, scopes: ['webview', 'main'], allowValues: ['apiKey'],
-      fingerprint: original, patchedFingerprint: patched, fingerprintPath: nodePath(fn, selector),
+      fingerprint: selectorVariant.fingerprint, patchedFingerprint: selectorVariant.patchedFingerprint,
+      fingerprintPath: nodePath(fn, selector),
       allowsSingleScope: Boolean(recipe.anyScope && [recipe, ...(recipe.compatibleFingerprints || [])]
         .some(candidate => candidate.fingerprint === shape(fn).fingerprint)),
       path: nodePath(fn, statements[3].argument.test), validation: 'submission-service-tier', skipValidation: false, environment: [] });

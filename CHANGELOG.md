@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- macOS patch revision 12 recognizes app 26.1023.50603 (22391): accept the added `amazonBedrock` provider branch in the Fast gates, request selector and saved-speed reader, while retaining the native model catalog and compact control. The revised archive passed temporary deep-signature validation without changing the installed app.
+
 - Register an optional native Windows login task for Codex Fast. Supported runtimes start in the tray through `startup-task` activation. Preserve the user's enabled/disabled choice across copy replacements and registration recovery; default to disabled for new installations and remove the entry with the local package on uninstall.
 
 - Keep Windows update workers independent through the desktop Explorer automation object and verify their parent and package context before allowing Quit. Persist confirmed restart requests so the monitor can finish registration and reopen a published copy after an interrupted helper, preserving the profile and recognizing an already reopened app. Normal exits, cancelled/failed updates and requests older than 30 minutes do not trigger recovery. Include registration, shortcut and reopening phases in update status.

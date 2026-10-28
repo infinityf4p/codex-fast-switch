@@ -58,17 +58,43 @@ function replacement(source, fn, target, kind, modelSettingsPath, modelPath = ['
     if (settings?.type !== 'Identifier' || target.type !== 'Identifier') throw new Error('Unsupported model query arguments.');
     return `{...${original},additionalAvailableModels:new Set([${[settings.name, ...modelPath].join('.')}])}`;
   }
-  if (kind === 'ui' && target.type === 'LogicalExpression' && target.operator === '||' &&
-      target.left?.type === 'BinaryExpression' && target.right?.type === 'BinaryExpression') {
-    const subject = target.left.left;
-    const values = allowedValues.length ? allowedValues.map(value => `${source.slice(subject.start, subject.end)}===${JSON.stringify(value)}`) :
-      [`${source.slice(subject.start, subject.end)}==="apikey"`];
-    return `(${original}||${values.join('||')})`;
+  if (kind === 'ui' && target.type === 'LogicalExpression' && target.operator === '||') {
+    // Newer bundles may add another reviewed auth method, nesting the first
+    // two comparisons under the left side of the OR expression. Keep the
+    // subject anchored to that first comparison before adding API-key access.
+    let comparison = target;
+    while (comparison.type === 'LogicalExpression' && comparison.operator === '||') comparison = comparison.left;
+    if (comparison?.type === 'BinaryExpression') {
+      const subject = comparison.left;
+      const values = allowedValues.length ? allowedValues.map(value => `${source.slice(subject.start, subject.end)}===${JSON.stringify(value)}`) :
+        [`${source.slice(subject.start, subject.end)}==="apikey"`];
+      return `(${original}||${values.join('||')})`;
+    }
+  }
+  if (kind === 'saved-request' && target.type === 'LogicalExpression' && target.operator === '||') {
+    let comparison = target;
+    while (comparison.type === 'LogicalExpression' && comparison.operator === '||') comparison = comparison.left;
+    if (comparison?.type === 'BinaryExpression') {
+      const subject = comparison.left;
+      const values = allowedValues.length ? allowedValues.map(value => `${source.slice(subject.start, subject.end)}===${JSON.stringify(value)}`) :
+        [`${source.slice(subject.start, subject.end)}==="apiKey"`];
+      return `(${original}||${values.join('||')})`;
+    }
   }
   if (kind === 'request' && target.type === 'LogicalExpression' && target.operator === '&&' &&
       target.left?.type === 'BinaryExpression' && target.right?.type === 'BinaryExpression') {
     const subject = target.left.left;
     return `(${original}&&${source.slice(subject.start, subject.end)}!=="apikey")`;
+  }
+  if (kind === 'request' && target.type === 'LogicalExpression' && target.operator === '||') {
+    let comparison = target;
+    while (comparison.type === 'LogicalExpression' && comparison.operator === '||') comparison = comparison.left;
+    if (comparison?.type === 'BinaryExpression') {
+      const subject = comparison.left;
+      const values = allowedValues.length ? allowedValues.map(value => `${source.slice(subject.start, subject.end)}===${JSON.stringify(value)}`) :
+        [`${source.slice(subject.start, subject.end)}==="apiKey"`];
+      return `(${original}||${values.join('||')})`;
+    }
   }
   if (target.type !== 'BinaryExpression') throw new Error('Unsupported authentication check.');
   if (allowedValues.length && (kind === 'request' || kind === 'saved-request')) {

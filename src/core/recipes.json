@@ -15,6 +15,13 @@
         "path": ["body", "body", 0, "declarations", 4, "init"],
         "allowValues": ["apikey"],
         "skipValidation": true
+      },
+      {
+        "fingerprint": "cdcf59d8807f53e89956e0174abfedc2a79900bfa557bacf120e85f8e234a169",
+        "patchedFingerprint": "90bc9d8bb7c3fbd9e0b9b6fea2463615e141bfe79bc3c4daf456c550a2daad55",
+        "path": ["body", "body", 0, "declarations", 4, "init"],
+        "allowValues": ["apikey"],
+        "skipValidation": true
       }
     ],
     "path": [
@@ -71,6 +78,12 @@
         "path": ["body", "body", 0, "argument", "body", "body", 6, "declarations", 0, "init", "argument", "arguments", 0, "elements", 0, "callee", "body", "body", 3, "argument", "test"],
         "allowValues": ["apiKey"],
         "skipValidation": true
+      }
+    ],
+    "selectorVariants": [
+      {
+        "fingerprint": "18562ec95ca720bdd4d65eefccf21834d4bb39e8b68db054a9ea93ca82fcc750",
+        "patchedFingerprint": "116d044f5f599c90a344a4f09f170be1dd2117996c419c39e254a4d05fab2d34"
       }
     ],
     "path": [
@@ -136,6 +149,10 @@
       {
         "fingerprint": "a2f66206477fe1b0902c3d2ddd799969cea8634fac864f027c3af799792fbed3",
         "patchedFingerprint": "a2f66206477fe1b0902c3d2ddd799969cea8634fac864f027c3af799792fbed3"
+      },
+      {
+        "fingerprint": "4a43769d3384fb42e460403e7c539075782f16637130ce8a962f2966b71fff07",
+        "patchedFingerprint": "4a43769d3384fb42e460403e7c539075782f16637130ce8a962f2966b71fff07"
       }
     ]
   },
@@ -156,6 +173,20 @@
         "fingerprint": "37e631ceade7f765d1d8551382d80bbcb129c45608aa238a3462a61183bfa91a",
         "patchedFingerprint": "973aa6d45d334150b43cc69899ea224bfb308ec4afb75e91835bb12270745fb2",
         "path": ["body", "body", 1, "argument", "properties", 0, "value", "body", "body", 1, "argument", "expressions", 1, "arguments", 3, "body", "alternate"],
+        "allowValues": ["apiKey"],
+        "skipValidation": true
+      },
+      {
+        "fingerprint": "1aacd49e45b953e9a39797035174001fc337f33f227c542c3a1bf320435ff34c",
+        "patchedFingerprint": "6d2d67f8bb87c224f8c6b7f61c8523321d76e1f8909325ec8bd8861d2481212d",
+        "path": ["body", "body", 1, "argument", "properties", 0, "value", "body", "body", 1, "argument", "expressions", 1, "arguments", 3, "body", "body", 2, "argument"],
+        "allowValues": ["apiKey"],
+        "skipValidation": true
+      },
+      {
+        "fingerprint": "de397bce1ff56bbf61df31bf99537d3a1ff0af89fb11d86176ffa2d2f0da4d42",
+        "patchedFingerprint": "b8ebeabbbde38b5bf5c905886fdd3a849815a2838b4ffe00e921fee0a3a7fd69",
+        "path": ["body", "body", 1, "argument", "properties", 0, "value", "body", "body", 1, "argument", "expressions", 1, "arguments", 3, "body", "body", 2, "argument"],
         "allowValues": ["apiKey"],
         "skipValidation": true
       }
