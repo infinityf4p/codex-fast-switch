@@ -4,11 +4,26 @@ const crypto = require('node:crypto');
 
 const readJson = file => JSON.parse(fs.readFileSync(file, 'utf8'));
 
+function publish(temp, file) {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      fs.renameSync(temp, file);
+      return;
+    } catch (error) {
+      // Windows can briefly deny replacing a JSON file while the app's
+      // progress reader still has its handle open. Keep the write atomic and
+      // retry only that transient sharing violation.
+      if (process.platform !== 'win32' || !['EPERM', 'EACCES', 'EBUSY'].includes(error.code) || attempt >= 8) throw error;
+      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, Math.min(1000, 25 * 2 ** attempt));
+    }
+  }
+}
+
 function saveJson(file, value) {
   const temp = `${file}.${crypto.randomUUID()}.tmp`;
   const fd = fs.openSync(temp, 'wx', 0o600);
   try { fs.writeFileSync(fd, JSON.stringify(value, null, 2) + '\n'); fs.fsyncSync(fd); } finally { fs.closeSync(fd); }
-  fs.renameSync(temp, file);
+  publish(temp, file);
   // Windows cannot fsync a directory handle; the file itself is flushed above.
   if (process.platform === 'win32') return;
   const directory = fs.openSync(path.dirname(file), 'r');
