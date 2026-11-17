@@ -238,6 +238,8 @@ async function planArchive(archive, recipes = defaultRecipes, iconRecipe = recip
   const files = asar.listPackage(archive).map(file => file.replaceAll('\\', '/').replace(/^\//, ''))
     .filter(file => (file.startsWith('webview/') || file.startsWith('.vite/build/')) && file.endsWith('.js'))
     .map(file => path.normalize(file));
+  const rspack = require('./rspack.cjs');
+  if (recipes === defaultRecipes && rspack.isRspack(archive, files)) return rspack.planArchive(archive, files);
   const targets = [];
   const allMatches = [];
   const detectedRequirements = new Set();

@@ -1,0 +1,134 @@
+[
+  {
+    "kind": "ui",
+    "module": "ipV4",
+    "scope": "webview",
+    "fingerprint": "d76d9154325eda479654946f7b7419eea63a3b4304c5c8e8df4a835949fa3e75",
+    "path": ["body","body",0,"declarations",7,"init"],
+    "allowValues": ["apikey"],
+    "patchedFingerprint": "32a2fd289276776fa4aa39fcd6a3d2ab9f661c0b59f4d95d89f1979a0e24b654"
+  },
+  {
+    "kind": "saved-request",
+    "module": "71817",
+    "scope": "main",
+    "fingerprint": "c3d18f5f2ca12796493724ac664a87e24441c567407c75b68c26da890bac1b10",
+    "path": ["body","body",1,"argument","properties",0,"value","body","body",1,"argument","expressions",1,"arguments",3,"body","body",2,"argument"],
+    "allowValues": ["apiKey"],
+    "patchedFingerprint": "69cea160cbf0f9ad09c274f49a880c3d0ae4e5c5111cd142d628d18b12a09c46",
+    "compatibleVariants": [
+      {
+        "module": "26307",
+        "fingerprint": "c3d18f5f2ca12796493724ac664a87e24441c567407c75b68c26da890bac1b10"
+      }
+    ]
+  },
+  {
+    "kind": "saved-request",
+    "module": "iyUU",
+    "scope": "webview",
+    "fingerprint": "c3d18f5f2ca12796493724ac664a87e24441c567407c75b68c26da890bac1b10",
+    "path": ["body","body",1,"argument","properties",0,"value","body","body",1,"argument","expressions",1,"arguments",3,"body","body",2,"argument"],
+    "allowValues": ["apiKey"],
+    "patchedFingerprint": "69cea160cbf0f9ad09c274f49a880c3d0ae4e5c5111cd142d628d18b12a09c46",
+    "compatibleVariants": [
+      {
+        "module": "V7mA",
+        "fingerprint": "c3d18f5f2ca12796493724ac664a87e24441c567407c75b68c26da890bac1b10"
+      }
+    ]
+  },
+  {
+    "kind": "request",
+    "module": "71817",
+    "scope": "main",
+    "fingerprint": "0c11b76a396f65fc5d376d6680656697618de20840fd4cf57e8b40d45fbb9950",
+    "path": ["body","body",0,"argument","body","body",7,"declarations",0,"init","argument","arguments",0,"elements",0,"callee","body","body",3,"argument","test"],
+    "allowValues": ["apiKey"],
+    "patchedFingerprint": "a3ab38566a5c7d6b9af6b29130327a6684b8d770ef9c27af69e11ec270f0ba37",
+    "compatibleVariants": [
+      {
+        "module": "26307",
+        "fingerprint": "999a0107b5d466d21b8ca2c70b77ab7a3def740ae71b2c0e82a21e2c295fa01f",
+        "path": ["body","body",0,"argument","body","body",7,"declarations",0,"init","argument","arguments",0,"elements",0,"callee","body","body",3,"argument","test"],
+        "patchedFingerprint": "0e5476ec79c44e85d8e589a70f5b4009884763e2c2b9924b4d04b86bf2d4b6e9"
+      }
+    ]
+  },
+  {
+    "kind": "request",
+    "module": "iyUU",
+    "scope": "webview",
+    "fingerprint": "0bb20ab47fefacdae5a2b93fdd7aa305567031b398117ad3ce81f6d29c534d29",
+    "path": ["body","body",0,"argument","body","body",6,"declarations",0,"init","argument","arguments",0,"elements",0,"callee","body","body",3,"argument","test"],
+    "allowValues": ["apiKey"],
+    "patchedFingerprint": "eb0dffbecfac84358604c7c6f614ce7baca07ec30635f6a995df047d55a08e39",
+    "compatibleVariants": [
+      {
+        "module": "V7mA",
+        "fingerprint": "0df1efa02dd544a330e32533e75dd9e873c1eedd1110eff28993273cca5ffe9e",
+        "path": ["body","body",0,"argument","body","body",6,"declarations",0,"init","argument","arguments",0,"elements",0,"callee","body","body",3,"argument","test"],
+        "patchedFingerprint": "f2bb8801e8ac3bc3304f7e86adf9091f633e990982c68c17c4ff839baefb2683"
+      }
+    ]
+  },
+  {
+    "kind": "model-name",
+    "module": "O5Ra",
+    "scope": "webview",
+    "fingerprint": "1c34ba201a4245747fe52cd8f3d1983b7c839e3becc1ab0e69876d416292b67a",
+    "path": ["body","body",2,"argument"],
+    "patchedFingerprint": "d72d9406eda6b73fac711c50fe8c4a1d87f79f98cc61b8fecc2220a95c8facd3"
+  },
+  {
+    "kind": "default-model-presets",
+    "module": "TWUU",
+    "scope": "webview",
+    "fingerprint": "91e468011d0c2115cd9be15a31c28196c46c0bb57b079fe12d60ecf8ebbec3fc",
+    "path": ["params",1,"left","properties",1,"value"],
+    "patchedFingerprint": "c2e3da4feeb3c41571f1e88ff7bddde0df4cde6e71643cf2319f144fa53f53b7"
+  },
+  {
+    "kind": "compact-model-control",
+    "module": "b6HF",
+    "scope": "webview",
+    "fingerprint": "c5bca4676896b74e8b2cad27bbe85af9c1e3a8761823a5f004f1d64890a799f8",
+    "native": true,
+    "patchedFingerprint": "c5bca4676896b74e8b2cad27bbe85af9c1e3a8761823a5f004f1d64890a799f8",
+    "compatibleVariants": [
+      {
+        "module": "ivi7",
+        "fingerprint": "49fb578981babc19acd947f46d9e7b357c07c6e18c115f3e07a4be9ea6aa47d7",
+        "patchedFingerprint": "49fb578981babc19acd947f46d9e7b357c07c6e18c115f3e07a4be9ea6aa47d7"
+      }
+    ]
+  },
+  {
+    "kind": "fast-icon",
+    "module": "GGWF",
+    "scope": "webview",
+    "fingerprint": "7230f312baabcc5a88f7b13521480d42ee6d644b1e8ed91a29673ea7c045049a",
+    "patchedFingerprint": "ed2eb7478ae4b38cf07c98b702b8893b9d0e17b222d48e3564b805688b3c35e9",
+    "compatibleVariants": [
+      {
+        "module": "mmK4",
+        "fingerprint": "7230f312baabcc5a88f7b13521480d42ee6d644b1e8ed91a29673ea7c045049a"
+      }
+    ]
+  },
+  {
+    "kind": "fast-icon-donor",
+    "module": "b6HF",
+    "scope": "webview",
+    "fingerprint": "7aab8a5049062769b98f75dabe8808557a8b9ee2dc26d95a0fc0c585c84d780c",
+    "native": true,
+    "patchedFingerprint": "7aab8a5049062769b98f75dabe8808557a8b9ee2dc26d95a0fc0c585c84d780c",
+    "compatibleVariants": [
+      {
+        "module": "ivi7",
+        "fingerprint": "7aab8a5049062769b98f75dabe8808557a8b9ee2dc26d95a0fc0c585c84d780c",
+        "patchedFingerprint": "7aab8a5049062769b98f75dabe8808557a8b9ee2dc26d95a0fc0c585c84d780c"
+      }
+    ]
+  }
+]

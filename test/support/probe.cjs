@@ -51,8 +51,10 @@ async function stopChild(child, closed) {
 }
 
 async function discoverModel(app, root, requested) {
-  const executable = path.join(app, process.platform === 'win32' ? 'resources/codex.exe' : 'Contents/Resources/codex');
-  if (!fs.existsSync(executable)) throw new Error('The bundled Codex backend was not found; this app layout is unsupported.');
+  const candidates = process.platform === 'win32' ? ['resources/codex.exe'] :
+    ['Contents/Resources/codex', 'Contents/Resources/codex-cli/bin/codex'];
+  const executable = candidates.map(file => path.join(app, file)).find(file => fs.existsSync(file));
+  if (!executable) throw new Error('The bundled Codex backend was not found; this app layout is unsupported.');
   const child = spawn(executable, ['app-server', '--stdio'], {
     cwd: root, env: probeEnvironment(root), stdio: ['pipe', 'pipe', 'ignore'], windowsHide: true,
   });

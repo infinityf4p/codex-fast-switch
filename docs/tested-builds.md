@@ -1,5 +1,22 @@
 # Tested builds
 
+## 2026-11-17: macOS 25471 and 27194 Rspack compatibility
+
+The production update feed offered **26.1111.21308 (27194)**. Its downloaded ZIP passed Ed25519 update-signature verification, and the extracted app passed official-signature verification. The user's installed **26.1103.32239 (25471)** was also adapted after the old worker reported `The matching filled Fast icon is unavailable.` All patching and launches used temporary copies; this work did not update, patch or restart the personal app.
+
+The new Rspack layout repeats modules in lazy chunks and uses anonymous request preparers. Revision **13** matches reviewed module IDs and whole-function fingerprints, requires every present copy to match, and patches both the main and renderer request selectors and saved-tier readers. Full model names, the five Default presets and filled Fast icons remain separate edits; the native compact control and animations are retained. Missing, changed or ambiguous copies are rejected. Earlier app layouts keep their existing adapters.
+
+| App build | Fast UI copies | Executed gate checks | Patched ASAR entries, including the update hook |
+| --- | ---: | ---: | ---: |
+| 25471 | 7 | 390 | 16 |
+| 27194 | 8 | 438 | 18 |
+
+Both isolated candidates passed `codesign --verify --deep --strict`, and every marker entry hash matched. The rewritten Electron integrity slot was disabled. Preparation through signing and verification took **48.1 seconds** for 25471 and **30.5 seconds** for 27194 on this machine; these are individual measurements under different load. Disposable test signing identities were removed, and source app fingerprints were unchanged.
+
+The **27194** live UI probe completed both conversation replies with `gpt-6.1-sol`: Fast sent `service_tier: "priority"`; Standard omitted it. The native composer showed the Fast icon only for Fast. The probe used a separate profile, dummy API credentials, a loopback Responses server and a temporary Storage helper backed by a dummy keychain, with other keychain reads denied. The bridge reported successful loading; this run does not establish a Storage Key read. The UI harness was updated for the relocated bundled backend, Home navigation, new CSS class names and retained hidden composers; earlier harness timeouts are not counted as successful runs. Build 25471 received archive and signing validation, not a separate live UI run.
+
+Source checks and the local suite passed **228 tests**, with **25 platform-specific skips** and **0 failures**. Regressions cover repeated lazy copies, reviewed module variants, changed or missing copies, ambiguous targets, module-table parsing, process scopes and resulting function fingerprints. These checks do not measure provider throughput or cover a complete official update cycle. This compatibility entry covers macOS arm64 builds 25471 and 27194; it does not certify build 25241 or a new Windows build.
+
 ## 2026-10-28: macOS 22391 compatibility
 
 The official app **26.1023.50603 (22391)** initially failed recognition after its provider predicates, request selector, model catalog and compact control changed. The reviewed adapter now accepts the added `amazonBedrock` branch in both request process scopes, recognizes the native model catalog and compact layout, and keeps the existing model-name, Default preset and filled Fast-icon transforms separate.

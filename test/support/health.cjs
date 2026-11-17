@@ -162,12 +162,12 @@ async function healthCheck(app, { onProgress = () => {}, screenshot, model: requ
         const trigger = Array.from(document.querySelectorAll('[data-composer-navigation-target="reasoning"]')).find(visible);
         if (!trigger) return null;
         const rect = e => { const r=e.getBoundingClientRect(); return {x:r.x,y:r.y,width:r.width,height:r.height}; };
-        const modelGroup = trigger.querySelector('[class*="ModelPickerTriggerModelLabel_"]') ||
+        const modelGroup = trigger.querySelector('[class*="ModelPickerTriggerModelLabel"]') ||
           trigger.querySelector('span.tabular-nums');
         const model = modelGroup?.querySelector('span.truncate.whitespace-nowrap') || modelGroup;
         const nativeLabelGroup = modelGroup?.classList.contains('tabular-nums') ? modelGroup.parentElement : modelGroup;
-        const effort = trigger.querySelector('[class*="ModelPickerTriggerEffortLabel_"]') || nativeLabelGroup?.nextElementSibling;
-        const icon = trigger.querySelector('svg[class*="ModelPickerTriggerInlineModeIcon_"]') || modelGroup?.querySelector('svg');
+        const effort = trigger.querySelector('[class*="ModelPickerTriggerEffortLabel"]') || nativeLabelGroup?.nextElementSibling;
+        const icon = trigger.querySelector('svg[class*="ModelPickerTriggerInlineModeIcon"]') || modelGroup?.querySelector('svg');
         const chevron = Array.from(trigger.querySelectorAll('svg')).find(e => e !== icon && e.parentElement === trigger);
         const colorSample = document.createElement('span');
         colorSample.style.cssText = 'position:absolute;visibility:hidden;color:var(--color-text)';
@@ -231,9 +231,10 @@ async function healthCheck(app, { onProgress = () => {}, screenshot, model: requ
       }
       await until(() => click(`Array.from(document.querySelectorAll('[role=menuitem],[role=menuitemradio],[role=option]')).find(e=>e.textContent.trim().startsWith(${JSON.stringify(tier)}))`), `select ${tier}`);
       await until(() => fs.readFileSync(path.join(home, 'config.toml'), 'utf8').includes(`service_tier = "${tier === 'Fast' ? 'priority' : 'default'}"`), 'save tier');
-      await click(button('Back to app'));
-      await until(() => click(`Array.from(document.querySelectorAll('button,a')).find(e=>e.textContent.trim()==='New chat')`), 'open new chat');
-      await until(() => click('document.querySelector("[contenteditable=true]")'), 'new task');
+      if (!await click(button('Back to app'))) await click(button('Home'));
+      await until(() => click(`Array.from(document.querySelectorAll('button,a')).find(e=>
+        (e.textContent.trim()==='New chat'||e.getAttribute('aria-label')==='New chat') && e.checkVisibility())`), 'open new chat');
+      await until(() => click('Array.from(document.querySelectorAll("[contenteditable=true]")).find(e=>e.checkVisibility())'), 'new task');
       await cdp.call('Input.insertText', { text: `Reply with FAST_MODE_UI_TEST_OK (${tier}).` }, session);
       // Auth/config queries can refresh after navigation; wait for the chosen
       // speed to reach the visible composer before submitting a new task.
@@ -241,9 +242,9 @@ async function healthCheck(app, { onProgress = () => {}, screenshot, model: requ
         const trigger = Array.from(document.querySelectorAll('[data-composer-navigation-target="reasoning"]'))
           .find(e => e.getBoundingClientRect().width > 0);
         if (!trigger || trigger.disabled || trigger.getAttribute('aria-disabled') === 'true') return false;
-        const group = trigger.querySelector('[class*="ModelPickerTriggerModelLabel_"]') ||
+        const group = trigger.querySelector('[class*="ModelPickerTriggerModelLabel"]') ||
           trigger.querySelector('span.tabular-nums');
-        const icon = trigger.querySelector('svg[class*="ModelPickerTriggerInlineModeIcon_"]') || group?.querySelector('svg');
+        const icon = trigger.querySelector('svg[class*="ModelPickerTriggerInlineModeIcon"]') || group?.querySelector('svg');
         return Boolean(icon) === ${tier === 'Fast'};
       })()`), `${tier} composer selection`);
       const count = requests.filter(item => item.model === model).length;
@@ -288,7 +289,7 @@ async function healthCheck(app, { onProgress = () => {}, screenshot, model: requ
     }
     throw error;
   } finally {
-    if (process.platform === 'win32' && cdp && !cdp.closed) {
+    if (cdp && !cdp.closed) {
       try { await cdp.call('Browser.close'); } catch {}
       cdp.close();
       if (closed) await Promise.race([closed, delay(5000)]);
@@ -298,7 +299,7 @@ async function healthCheck(app, { onProgress = () => {}, screenshot, model: requ
     }
     server.closeAllConnections();
     await new Promise(resolve => server.close(resolve));
-    fs.rmSync(root, { recursive: true, force: true, maxRetries: 3, retryDelay: 300 });
+    fs.rmSync(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 500 });
   }
 }
 module.exports = { healthCheck };
