@@ -20,6 +20,11 @@
       {
         "module": "26307",
         "fingerprint": "c3d18f5f2ca12796493724ac664a87e24441c567407c75b68c26da890bac1b10"
+      },
+      {
+        "module": "6286",
+        "fingerprint": "e6b4303341317116183065061508cd14a0f9d74b9e042e58f8d82f91476d6568",
+        "patchedFingerprint": "eb18890009d342b87a33b7d18cbdddb90461d8a76b1246fc5a4df95e2a6d953e"
       }
     ]
   },
@@ -52,6 +57,11 @@
         "fingerprint": "999a0107b5d466d21b8ca2c70b77ab7a3def740ae71b2c0e82a21e2c295fa01f",
         "path": ["body","body",0,"argument","body","body",7,"declarations",0,"init","argument","arguments",0,"elements",0,"callee","body","body",3,"argument","test"],
         "patchedFingerprint": "0e5476ec79c44e85d8e589a70f5b4009884763e2c2b9924b4d04b86bf2d4b6e9"
+      },
+      {
+        "module": "6286",
+        "fingerprint": "7f531ec33f4417a5ea1ad19fe3f966128c83e0693a4359f8f186974986ca178c",
+        "patchedFingerprint": "cc01d5da8bb47eed2b9d3cfbbf997defd5e243d8696030a1a81ca574c6cd1caf"
       }
     ]
   },

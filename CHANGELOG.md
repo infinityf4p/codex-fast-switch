@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Windows patch revision 11 supports Store package 26.1111.2228.0 / app 26.1111.21308 (27194). Reuse the Rspack UI adapter and add reviewed Windows main-process request and saved-speed variants. Recognize the newer native updater's complete interface, preserve its readiness and operation arguments, and return explicit install success/failure. Keep the native compact picker, full model names, Default presets and filled Fast icons.
+
 - macOS patch revision 13 supports apps 26.1103.32239 (25471) and 26.1111.21308 (27194). Recognize the new Rspack module layout, patch every lazy copy of the Fast gate and both request scopes, and retain the native picker with full model names, Default presets and a filled Fast icon. Unknown or inconsistent module copies stop preparation before the installed app is changed.
 
 - macOS patch revision 12 recognizes app 26.1023.50603 (22391): accept the added `amazonBedrock` provider branch in the Fast gates, request selector and saved-speed reader, while retaining the native model catalog and compact control. The revised archive passed temporary deep-signature validation without changing the installed app.

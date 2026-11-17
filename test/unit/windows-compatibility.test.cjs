@@ -4,6 +4,10 @@ const { validateSignatures } = require('../../src/platforms/windows/signatures.c
 const { planWindowsArchive } = require('../../src/platforms/windows/plan.cjs');
 const { adapt } = require('../../src/platforms/windows/updater.cjs');
 const { parse, shape } = require('../../src/core/adaptive.cjs');
+const fs = require('node:fs');
+const path = require('node:path');
+const vm = require('node:vm');
+const modern = fs.readFileSync(path.join(__dirname, '../fixtures/windows-updater-27194.js'), 'utf8');
 
 test('future signed runtime versions are accepted without a per-build hash list', () => {
   const files = ['ChatGPT.exe', 'chrome.dll', 'resources/codex.exe'];
@@ -67,6 +71,52 @@ test('unknown updater interfaces and ambiguous managers are not patched', () => 
     manager.replace('async initializeWindowsUpdater()', 'static async initializeWindowsUpdater()'),
     manager + manager.replace('class Manager', 'class Other'),
   ]) assert.throws(() => adapt(source, {}, new Set()), { code: 'UNSUPPORTED_UPDATER' });
+});
+
+test('the reviewed Rspack updater preserves native operations and changes only Windows initialization', () => {
+  for (const source of [modern, modern.replaceAll('"', "'").replaceAll('let ', 'let  ')]) {
+    const patched = adapt(source, { state: 'state', id: 'generation' }, new Set()).toString();
+    const methods = text => parse(text).body[0].body.body;
+    const unchanged = text => methods(text).filter(m => m.key.name !== 'initializeWindowsUpdater').map(shape);
+    assert.deepEqual(unchanged(patched), unchanged(source));
+    assert.match(patched, /this\.updater=/);
+  }
+  for (const changed of [
+    modern.replace('return this.isUpdateReady&&', 'return this.other&&'),
+    modern.replace('await t.checkForUpdates(e)', 'await t.checkForUpdates()'),
+    modern.replace('await n.installUpdatesIfAvailable(e,t)', 'await n.installUpdatesIfAvailable("auto",t)'),
+    modern.replace('this.options.onUpdateReadyChanged?.(e)', 'this.options.onUpdateReadyChanged?.(false)'),
+    modern.replace('this.options.onUpdateLifecycleStateChanged?.(e)', 'this.options.onUpdateLifecycleStateChanged?.("ready")'),
+    modern.replace('onInstallReadinessChanged:e=>this.setUpdateReady(e)', 'onInstallReadinessChanged:e=>this.setUpdateReady(true)'),
+    modern + modern.replace('class Manager', 'class Other'),
+  ]) assert.throws(() => adapt(changed, {}, new Set()), { code: 'UNSUPPORTED_UPDATER' });
+});
+
+test('modern native readiness requires the ready lifecycle and forwards operation arguments and failure', async () => {
+  const Manager = vm.runInNewContext(modern + ';Manager', { process: { platform: 'win32' } });
+  const manager = new Manager();
+  let aborted = 0;
+  const calls = [];
+  manager.options = { onInstallUpdatesAborted: () => { aborted++; } };
+  manager.setUpdateDownloaded = manager.applyPendingSparkleQueryParams = manager.scheduleForcedUpdateInstall = () => {};
+  manager.logger = { error: () => assert.fail('unexpected native updater error') };
+  manager.updater = {
+    checkForUpdates: async reason => calls.push(['check', reason]),
+    installUpdatesIfAvailable: async (...args) => { calls.push(['install', ...args]); return false; },
+  };
+  manager.setUpdateReady(true);
+  manager.setUpdateLifecycleState('downloading');
+  assert.equal(manager.getIsUpdateReady(), false);
+  manager.setUpdateLifecycleState('ready');
+  assert.equal(manager.getIsUpdateReady(), true);
+  await manager.checkForUpdates('menu');
+  assert.equal(await manager.installUpdatesIfAvailable('user', 'menu'), false);
+  assert.equal(aborted, 1);
+  assert.deepEqual(calls, [['check', 'menu'], ['install', 'user', 'menu']]);
+  manager.updater.installUpdatesIfAvailable = async () => true;
+  assert.equal(await manager.installUpdatesIfAvailable(), true);
+  manager.setUpdateReady(false);
+  assert.equal(manager.getIsUpdateReady(), false);
 });
 
 test('a changed Windows layout retains the matching model names, filled icon and Fast checks', async () => {

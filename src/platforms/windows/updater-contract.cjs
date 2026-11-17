@@ -14,6 +14,12 @@ function supportsContract(body) {
     'getIsUpdateReady', 'checkForUpdates', 'installUpdatesIfAvailable'];
   if (names.some(name => definitions.filter(node => node.key.name === name).length !== 1)) return false;
   if (definitions.some(node => names.includes(node.key.name) && (node.static || node.kind !== 'method'))) return false;
+  // Rspack builds add operation arguments, readiness/lifecycle coupling and a
+  // renamed native callback. Accept the reviewed interface as a whole; an
+  // initializer fingerprint alone would not validate those changed methods.
+  const { shape } = require('../../core/adaptive.cjs');
+  if (require('./updater-interfaces.json').some(contract => names.every(name =>
+    shape(definitions.find(node => node.key.name === name)).fingerprint === contract.methods[name]))) return true;
   const methods = Object.fromEntries(definitions.map(node => [node.key.name, node.value]));
   const ready = methods.setUpdateReady.params[0], lifecycle = methods.setUpdateLifecycleState.params[0];
   if (ready?.type !== 'Identifier' || lifecycle?.type !== 'Identifier' ||

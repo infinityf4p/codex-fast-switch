@@ -1,5 +1,15 @@
 # Tested builds
 
+## 2026-11-17: Windows 27194 Rspack compatibility
+
+The official Windows production feed and registered x64 package both reported **26.1111.2228.0**, containing app **26.1111.21308 (27194)**. The shared macOS Rspack recipes recognized the renderer, while Windows required its own merged main-process request/saved-speed fingerprints and the newer native updater interface.
+
+Revision **11** passed **438 executed gate checks**, recognizing all eight lazy UI copies and both request scopes. A real isolated copy received **18 ASAR entry edits**, including the native Windows updater. Preparation and verification took **54.6 seconds** on this machine. The patched ASAR header matched the executable's embedded integrity resource; the final file fingerprints and patched-app verification passed, and the official source fingerprints were unchanged. The test did not register or launch this candidate or replace the running personal copy.
+
+The complete local suite passed **244 tests**, with **11 platform-specific skips** and **0 failures**. Regressions exercise the reviewed updater methods, native readiness/lifecycle coupling, forwarded operation arguments, install success/failure and rejection of changed interfaces. Windows build, PowerShell syntax and ZIP packaging checks also passed. The native compact control was recognized without cosmetic fallback; model labels, Default presets and filled Fast icons used the shared transforms.
+
+This verifies archive preparation and updater compatibility, not a live Windows UI/model response, login cycle or complete official-update/relaunch cycle. The earlier macOS live-UI result below does not substitute for Windows UI testing.
+
 ## 2026-11-17: macOS 25471 and 27194 Rspack compatibility
 
 The production update feed offered **26.1111.21308 (27194)**. Its downloaded ZIP passed Ed25519 update-signature verification, and the extracted app passed official-signature verification. The user's installed **26.1103.32239 (25471)** was also adapted after the old worker reported `The matching filled Fast icon is unavailable.` All patching and launches used temporary copies; this work did not update, patch or restart the personal app.

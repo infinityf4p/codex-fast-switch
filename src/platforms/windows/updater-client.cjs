@@ -136,7 +136,7 @@ module.exports = function createUpdater(manager, binding, dependencies = {}) {
             detail: words.unknownDetail, buttons: [words.store, words.close], defaultId: 1, cancelId: 1 });
           if (response.response === 0) await shell.openExternal(storeUrl);
         }
-        return;
+        return false;
       }
       manager.setUpdateLifecycleState('installing');
       const token = crypto.randomUUID();
@@ -167,11 +167,13 @@ module.exports = function createUpdater(manager, binding, dependencies = {}) {
       save({ status: 'install', userData: app.getPath('userData') });
       if (manager.options.onInstallUpdatesRequested) manager.options.onInstallUpdatesRequested();
       else app.quit();
+      return true;
     } catch (error) {
       if (file) { try { save({ status: 'cancelled' }); } catch {} }
       manager.setUpdateLifecycleState(ready ? 'ready' : 'idle');
       manager.options.onInstallUpdatesAborted?.();
       await showError(error);
+      return false;
     }
   }
 

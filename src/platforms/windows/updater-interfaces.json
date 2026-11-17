@@ -1,0 +1,13 @@
+[
+  {
+    "build": "27194",
+    "methods": {
+      "initializeWindowsUpdater": "5fb542c7a6b8a1947af601c4eb444be5b6dc412ea87d2a652b201e0e6061ab29",
+      "setUpdateReady": "9bce19beae603c1dc5a86b13cc584085e22fe1cd0dab661c0192600d3ffcef70",
+      "setUpdateLifecycleState": "04aa1903ddfe7935434875534f6e2332a0f974aeff0569648ef96a4d879fc93c",
+      "getIsUpdateReady": "2f78026caa9752a004a99ab87c38eb9f06ed92f4ca326078ff207ac88f87d94b",
+      "checkForUpdates": "5f86f2ad0337ba291a24639216ff597227f44675a3079b638e2e93d5585bf0d3",
+      "installUpdatesIfAvailable": "ff4b8adb3c2d03276b44e8729ba19209bdadd8b1cecc9a9ba200f6eecddb9b07"
+    }
+  }
+]

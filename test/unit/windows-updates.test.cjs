@@ -106,7 +106,7 @@ test('one native click installs the official update before patch handoff and pre
   f.official.complete({ status: 'installed', version: '26.1007.2314.0' });
   await new Promise(resolve => setImmediate(resolve));
   f.helper.setStatus({ status: 'ready' });
-  await operation;
+  assert.equal(await operation, true);
   assert.deepEqual(f.events.slice(-2), [['prepare'], ['quit']]);
   assert.equal(store.readOptional(f.helper.file).userData, 'C:\\Profiles\\A & B');
   assert.deepEqual(f.dialogs, []);
@@ -121,7 +121,7 @@ test('failed official download or installation leaves the current app running an
     const operation = f.client.installUpdatesIfAvailable();
     await new Promise(resolve => setImmediate(resolve));
     f.official.complete({ error });
-    await operation;
+    assert.equal(await operation, false);
     assert.equal(f.dialogs.at(-1).detail, error);
     assert.equal(f.helper, null);
     assert.equal(f.events.some(event => ['quit', 'prepare'].includes(event[0])), false);
@@ -136,7 +136,7 @@ test('a catalog-only version without a released download does not begin a spurio
   const operation = f.client.installUpdatesIfAvailable();
   await new Promise(resolve => setImmediate(resolve));
   f.official.complete({ status: 'current' });
-  await operation;
+  assert.equal(await operation, false);
   assert.equal(f.helper, null);
   assert.match(f.dialogs[0].detail, /does not have an automatic download/);
 });
@@ -148,7 +148,7 @@ test('a manual offline Store check never claims the official app is current', as
   assert.equal(f.dialogs[0].type, 'warning');
   assert.equal(f.dialogs[0].message, 'Could not check official updates');
   assert.equal(f.events.some(event => event[0] === 'quit'), false);
-  await f.client.installUpdatesIfAvailable();
+  assert.equal(await f.client.installUpdatesIfAvailable(), false);
   assert.equal(f.dialogs[1].message, 'Could not check official updates');
   assert.equal(f.helper, null);
 });
@@ -175,7 +175,7 @@ test('a failed helper leaves the app running with an actionable native dialog', 
   const operation = f.client.installUpdatesIfAvailable();
   await new Promise(resolve => setImmediate(resolve));
   f.helper.setStatus({ status: 'failed', error: 'Disk full' });
-  await operation;
+  assert.equal(await operation, false);
   assert.equal(f.events.some(event => event[0] === 'quit'), false);
   assert.equal(f.dialogs[0].detail, 'Disk full');
   assert.equal(f.client.getIsUpdateReady(), true);
