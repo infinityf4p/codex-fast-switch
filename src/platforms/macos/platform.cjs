@@ -36,7 +36,9 @@ function discoverApp(explicit) {
 }
 const binaryPath = app => path.join(app, 'Contents/MacOS', metadata(app).executable);
 const identityFiles = app => ['Contents/Info.plist', `Contents/MacOS/${metadata(app).executable}`,
-  'Contents/_CodeSignature/CodeResources', 'Contents/Resources/app.asar'];
+  'Contents/_CodeSignature/CodeResources', 'Contents/Resources/app.asar',
+  ...fs.existsSync(path.join(app, 'Contents/Resources/codex-fast-service-tiers.json'))
+    ? ['Contents/Resources/codex-fast-service-tiers.json'] : []];
 function assertStopped(app) {
   const binary = binaryPath(app);
   const output = execFileSync('/bin/ps', ['-axo', 'command='], { encoding: 'utf8' });

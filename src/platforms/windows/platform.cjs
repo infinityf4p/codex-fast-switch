@@ -66,13 +66,15 @@ function discoverApp(explicit) {
   return apps[0];
 }
 const binaryPath = app => path.join(app, 'ChatGPT.exe');
-const identityFiles = () => ['ChatGPT.exe', 'chrome.dll', 'resources/codex.exe', 'resources/app.asar',
-  'owl-shell-runtime.json', 'resources/owl-app.ini'];
-const stamp = app => JSON.stringify([app, ...identityFiles().map(file => {
+const identityFiles = app => ['ChatGPT.exe', 'chrome.dll', 'resources/codex.exe', 'resources/app.asar',
+  'owl-shell-runtime.json', 'resources/owl-app.ini',
+  ...app && fs.existsSync(path.join(app, 'resources/codex-fast-service-tiers.json'))
+    ? ['resources/codex-fast-service-tiers.json'] : []];
+const stamp = app => JSON.stringify([app, ...identityFiles(app).map(file => {
   const stat = fs.statSync(path.join(app, file));
   return [stat.size, stat.mtimeMs, stat.ctimeMs];
 })]);
-const fingerprint = app => Object.fromEntries(identityFiles().map(file => [file, sha256(fs.readFileSync(path.join(app, file)))]));
+const fingerprint = app => Object.fromEntries(identityFiles(app).map(file => [file, sha256(fs.readFileSync(path.join(app, file)))]));
 function same(app, expected) {
   try { return JSON.stringify(fingerprint(app)) === JSON.stringify(expected); } catch { return false; }
 }

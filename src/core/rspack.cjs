@@ -42,7 +42,11 @@ function transform(source, fn, recipe, donor) {
   const { at, replacement, adaptFastIcon, shape } = require('./adaptive.cjs');
   let result = source.slice(fn.start, fn.end);
   if (recipe.native) return result;
-  if (recipe.kind === 'fast-icon') {
+  if (recipe.kind === 'api-ultrafast-backend') {
+    result = require('./backend-speed.cjs').inject(source, fn);
+  } else if (recipe.kind === 'api-configured-model') {
+    result = require('./configured-model.cjs').inject(source, fn);
+  } else if (recipe.kind === 'fast-icon') {
     const input = `const target=${result};const donor=${donor};`;
     const patched = adaptFastIcon(input).patched;
     result = patched.slice('const target='.length, patched.indexOf(';const donor='));
@@ -152,7 +156,7 @@ async function validate(match) {
     const conversation = statements[0].consequent.argument.arguments[0].left.expression.object.name;
     const client = statements[2].declarations[0].init.argument.callee.object.name;
     const code = `(${text.slice(selector.start, selector.end)})()`;
-    for (const auth of ['apiKey', 'chatgpt', 'amazonBedrock', 'other', null]) for (const tier of ['priority', null, undefined]) {
+    for (const auth of ['apiKey', 'chatgpt', 'amazonBedrock', 'other', null]) for (const tier of ['priority', 'ultrafast', null, undefined]) {
       let queried = false;
       const result = await run(code, { [options]: { serviceTier: tier }, [saved]: () => { throw new Error('Unexpected default lookup.'); },
         [client]: { getAccount: async () => { queried = true; return { account: auth == null ? null : { type: auth } }; } } });
@@ -160,7 +164,7 @@ async function validate(match) {
       if (result !== expected || queried !== (tier != null)) throw new Error('Rspack request gate verification failed.');
       checks.push({ kind: 'request', auth, tier: tier ?? null, passed: true });
     }
-    for (const tier of ['priority', null]) {
+    for (const tier of ['priority', 'ultrafast', null]) {
       const result = await run(code, { [options]: null, [conversation]: { latestModel: 'selected-model' },
         [saved]: async model => { if (model !== 'selected-model') throw new Error('Saved model changed.'); return tier; } });
       if (result !== tier) throw new Error('Rspack saved-tier delegation changed.');

@@ -1,5 +1,21 @@
 # Tested builds
 
+## 2026-11-18: Ultrafast and configured GPT-6.2 models
+
+macOS patch revision 14 was tested in an isolated copy of **26.1103.32239 (25471)**, with a separate profile, dummy key and loopback Responses server. Native Speed menu selections produced these completed conversation requests (title requests excluded):
+
+| Configured model | Speed selection | Outgoing `service_tier` |
+| --- | --- | --- |
+| `gpt-6.2-sol` | Ultrafast → Fast → Standard | `ultrafast` → `priority` → omitted |
+| `gpt-6.2-astra` | Ultrafast | `ultrafast` |
+| `gpt-6.1-sol` | Ultrafast | `ultrafast` |
+
+All five replies completed with reasoning effort `low`. The copy passed deep signature verification. The running personal app and official backup were not replaced. Tests used a dummy Storage Key helper and denied other Keychain reads.
+
+The bundled backend originally warned that unadvertised tiers would be omitted. The fix generates a separate catalog from that backend's own metadata and passes it only to the bundled local API-key backend. Existing custom catalogs and OAuth launches are preserved. Missing 6.2 metadata inherits the preceding model family's template and stays hidden unless explicitly selected in configuration; it is not a claim to reproduce every capability of a newer official backend. The native query includes the configured model so settings and the composer can read its speed metadata.
+
+Build **27194** passed archive recognition with both new adapters; its live UI was not rerun in this round. Windows revision 12 shares the adapters and passed platform-independent fixture tests, but no new Windows UI run was performed. The local suite passed **237 tests**, with **25 platform-specific skips** and **0 failures**. These loopback checks establish outgoing parameters, not provider speed or billing. Ordinary new-chat turns were tested; tool-call follow-ups and in-flight switching were not retested.
+
 ## 2026-11-17: Windows 27194 Rspack compatibility
 
 The official Windows production feed and registered x64 package both reported **26.1111.2228.0**, containing app **26.1111.21308 (27194)**. The shared macOS Rspack recipes recognized the renderer, while Windows required its own merged main-process request/saved-speed fingerprints and the newer native updater interface.

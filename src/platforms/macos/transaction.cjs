@@ -15,7 +15,7 @@ const { saveJson, readJson, withLock } = require('../../core/state.cjs');
 
 const DEFAULT_STATE = path.join(os.homedir(), 'Library/Application Support/Codex Fast Switch');
 const PATCH_ID = 'codex-fast-switch-v1';
-const PATCH_REVISION = 13;
+const PATCH_REVISION = 14;
 const MARKER = 'Contents/Resources/codex-fast-switch.json';
 const archivePath = app => path.join(app, 'Contents/Resources/app.asar');
 const equal = (a, b) => JSON.stringify(a) === JSON.stringify(b);
@@ -86,6 +86,8 @@ async function stage(app, destination, plan, metadata, state) {
     });
   }
   updateHook.copyResources(destination, app, state);
+  const backendServiceTiers = plan.targets.some(t => t.kinds?.includes('api-ultrafast-backend'))
+    ? require('../../core/backend-catalog.cjs').copy(app, destination, 'darwin') : null;
   const storageHelper = storage.copyBridge(destination, app, state);
   execFileSync('/usr/libexec/PlistBuddy', ['-c',
     `Set :ElectronAsarIntegrity:Resources/app.asar:hash ${hashes.headerSha256}`, path.join(destination, 'Contents/Info.plist')]);
@@ -97,6 +99,7 @@ async function stage(app, destination, plan, metadata, state) {
     signing.signFramework(integrity.framework, state, { identity, expectedCertificateSha256: identity.certificateSha256 });
   }
   saveJson(path.join(destination, MARKER), { patchId: PATCH_ID, revision: PATCH_REVISION, ...metadata,
+    ...(backendServiceTiers ? { backendServiceTiers } : {}),
     ...(storageHelper ? { storageHelper } : {}),
     signingCertificateSha256: identity.certificateSha256,
     archiveSha256: hashes.patchedArchiveSha256, entries: targets.map(target => ({ entry: target.entry, sha256: sha256(target.patched) })) });

@@ -1,5 +1,25 @@
 [
   {
+    "kind": "api-configured-model",
+    "module": "j44z",
+    "scope": "webview",
+    "fingerprint": "04d5b1be0aa5e7d3c52dcde096be20721ba3bb82139da82552af1ed79b8d942c",
+    "patchedFingerprint": "e215f33415c219041a7290e0ec2382209998369b5696cc96560ad8e2bd5a4059"
+  },
+  {
+    "kind": "api-ultrafast-backend",
+    "module": "7103",
+    "scope": "main",
+    "fingerprint": "cb9550e5bc7953a01b096b06799aeb197dbe737e3861742ed01b88d04cfacc83",
+    "patchedFingerprint": "15a9467bc0968b0fbddd56ba3eafd0b30441a25fbd5096653e63beb5050bdcc5",
+    "compatibleVariants": [
+      {
+        "fingerprint": "90c5434a2a6614715eb356585d277ee6ee01a8ad70223e42001bc5224aeb51cc",
+        "patchedFingerprint": "3c20e57f0ead86a49439c803ebc55a78568aaf66c96537a3842594868bab9e5f"
+      }
+    ]
+  },
+  {
     "kind": "ui",
     "module": "ipV4",
     "scope": "webview",

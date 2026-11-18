@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- macOS revision 14 / Windows revision 12 add Ultrafast support for reviewed Rspack builds. Supply a separate speed catalog only to bundled local API-key backends, preserving OAuth, custom CLI commands and explicit catalogs. Keep the visible model list unchanged except for the model explicitly selected in configuration. Hidden GPT-6.2 metadata uses the bundled preceding-family template until native metadata is available. Verify that requested Ultrafast survives the renderer, main process and backend instead of being silently omitted.
+
 - Windows patch revision 11 supports Store package 26.1111.2228.0 / app 26.1111.21308 (27194). Reuse the Rspack UI adapter and add reviewed Windows main-process request and saved-speed variants. Recognize the newer native updater's complete interface, preserve its readiness and operation arguments, and return explicit install success/failure. Keep the native compact picker, full model names, Default presets and filled Fast icons.
 
 - macOS patch revision 13 supports apps 26.1103.32239 (25471) and 26.1111.21308 (27194). Recognize the new Rspack module layout, patch every lazy copy of the Fast gate and both request scopes, and retain the native picker with full model names, Default presets and a filled Fast icon. Unknown or inconsistent module copies stop preparation before the installed app is changed.

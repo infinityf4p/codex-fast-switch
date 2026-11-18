@@ -9,7 +9,7 @@ const { patchArchive, sha256 } = require('../../core/archive.cjs');
 const { saveJson, readJson, withLock } = require('../../core/state.cjs');
 
 const PATCH_ID = 'codex-fast-switch-windows-v1';
-const PATCH_REVISION = 11;
+const PATCH_REVISION = 12;
 const configPath = state => path.join(state, 'windows.json');
 const activePath = state => path.join(state, 'windows-active.json');
 const statusPath = state => path.join(state, 'windows-status.json');
@@ -128,6 +128,9 @@ async function install(source, state, { onPhase = () => {}, verify = platform.ve
         if (sha256(bytes) !== target.sourceSha256) throw new Error('Source archive changed while patching.');
         return target.patched;
       });
+    }
+    if (prepared.targets.some(t => t.kinds?.includes('api-ultrafast-backend'))) {
+      record.backendServiceTiers = require('../../core/backend-catalog.cjs').copy(source, app, 'win32');
     }
     record.integrity = integrity.patch(app, originalHeader);
     record.patched = platform.fingerprint(app);

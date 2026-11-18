@@ -6,6 +6,8 @@ Enable Codex's native **Standard / Fast** controls when using an **API key or re
 
 The patch exposes controls already in the app. It does not provide OAuth access, a subscription, or priority capacity. Fast sends `service_tier: "priority"`; actual speed and pricing depend on the model and provider.
 
+New Rspack builds also support the native **Ultrafast** menu, sending `service_tier: "ultrafast"`. The patch supplies local API-key backends with speed metadata so older backends do not discard the requested tier. This covers GPT-6.1 Sol, GPT-6 Astra, and GPT-6.2 Sol / Astra selected in `config.toml`. Unselected new models stay hidden; OAuth and explicit custom catalogs retain their existing handling. Provider acceptance and the effective processing tier remain server-controlled. [Official Ultrafast guide](https://developers.openai.com/api/docs/guides/ultrafast-mode)
+
 ## Preview
 
 Native Speed settings, expanded model and reasoning controls, and the collapsed conversation model picker:

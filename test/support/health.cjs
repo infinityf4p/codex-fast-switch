@@ -10,12 +10,16 @@ const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 
 async function healthCheck(app, { onProgress = () => {}, screenshot, model: requestedModel,
   reasoningEffort, modelLabel, verifyCompactControl = false, verifyModelPresentation = false, verifyCompactColors = false,
-  compactScreenshot, colorScheme } = {}) {
+  compactScreenshot, colorScheme, configuredModel, speedModes = ['Fast', 'Standard'] } = {}) {
+  const tiers = { Standard: null, Fast: 'priority', Ultrafast: 'ultrafast' };
+  if (!speedModes.length || speedModes.some(mode => !Object.hasOwn(tiers, mode))) throw new Error('Invalid verification speed mode.');
   if (reasoningEffort !== undefined && !['none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max', 'ultra', 'persistent'].includes(reasoningEffort)) {
     throw new Error('Invalid verification reasoning effort.');
   }
   if (colorScheme !== undefined && !['light', 'dark'].includes(colorScheme)) throw new Error('Invalid verification color scheme.');
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'codex-fast-health-'));
+  // macOS Unix-domain sockets have a short path limit. Nesting the app's
+  // runtime sockets below the long per-user TMPDIR can block native startup.
+  const root = fs.mkdtempSync(path.join(process.platform === 'darwin' ? '/private/tmp' : os.tmpdir(), 'codex-fast-health-'));
   const home = path.join(root, 'codex');
   const userData = path.join(root, 'profile');
   fs.mkdirSync(home, { mode: 0o700 });
@@ -63,7 +67,8 @@ async function healthCheck(app, { onProgress = () => {}, screenshot, model: requ
     fs.writeFileSync(path.join(home, 'auth.json'), JSON.stringify({ OPENAI_API_KEY: 'sk-local-fast-probe-only' }), { mode: 0o600 });
     const configFile = path.join(home, 'config.toml');
     fs.writeFileSync(configFile, probeConfig(server.address().port), { mode: 0o600 });
-    const model = await discoverModel(app, root, requestedModel);
+    const discoveredModel = await discoverModel(app, root, requestedModel);
+    const model = configuredModel ?? discoveredModel;
     const effortConfig = reasoningEffort ? `model_reasoning_effort = ${JSON.stringify(reasoningEffort)}\n` : '';
     const themeConfig = colorScheme ? `\n[desktop]\nappearanceTheme = ${JSON.stringify(colorScheme)}\n` : '';
     fs.writeFileSync(configFile, effortConfig + probeConfig(server.address().port, model) + themeConfig, { mode: 0o600 });
@@ -150,7 +155,7 @@ async function healthCheck(app, { onProgress = () => {}, screenshot, model: requ
       if (text !== previousOnboardingText) onProgress({ phase: 'onboarding', snapshot: text.slice(0, 1500) });
       previousOnboardingText = text;
       return false;
-    }, 'onboarding', 90000);
+    }, 'onboarding', 120000);
     async function settings() {
       await until(() => click('document.querySelector("button[aria-label=\\"Open profile menu\\"]")'), 'account menu');
       await until(() => click(`Array.from(document.querySelectorAll('[role=menuitem],button,a')).find(e=>e.textContent.trim().startsWith('Settings'))`), 'open settings');
@@ -222,15 +227,15 @@ async function healthCheck(app, { onProgress = () => {}, screenshot, model: requ
         fs.writeFileSync(compactScreenshot, Buffer.from(shot.data, 'base64'));
       }
     }
-    for (const tier of ['Fast', 'Standard']) {
+    for (const tier of speedModes) {
       await settings();
-      await until(() => click(`Array.from(document.querySelectorAll('button')).find(e=>['Standard','Fast'].includes(e.textContent.trim()))`), 'Speed menu');
+      await until(() => click(`Array.from(document.querySelectorAll('button')).find(e=>['Standard','Fast','Ultrafast'].includes(e.textContent.trim()))`), 'Speed menu');
       if (screenshot && tier === 'Standard') {
         const shot = await cdp.call('Page.captureScreenshot', { format: 'png' }, session);
         fs.writeFileSync(screenshot, Buffer.from(shot.data, 'base64'));
       }
       await until(() => click(`Array.from(document.querySelectorAll('[role=menuitem],[role=menuitemradio],[role=option]')).find(e=>e.textContent.trim().startsWith(${JSON.stringify(tier)}))`), `select ${tier}`);
-      await until(() => fs.readFileSync(path.join(home, 'config.toml'), 'utf8').includes(`service_tier = "${tier === 'Fast' ? 'priority' : 'default'}"`), 'save tier');
+      await until(() => fs.readFileSync(path.join(home, 'config.toml'), 'utf8').includes(`service_tier = "${tiers[tier] ?? 'default'}"`), 'save tier');
       if (!await click(button('Back to app'))) await click(button('Home'));
       await until(() => click(`Array.from(document.querySelectorAll('button,a')).find(e=>
         (e.textContent.trim()==='New chat'||e.getAttribute('aria-label')==='New chat') && e.checkVisibility())`), 'open new chat');
@@ -241,18 +246,25 @@ async function healthCheck(app, { onProgress = () => {}, screenshot, model: requ
       await until(() => evaluate(`(() => {
         const trigger = Array.from(document.querySelectorAll('[data-composer-navigation-target="reasoning"]'))
           .find(e => e.getBoundingClientRect().width > 0);
+        if (${Boolean(configuredModel)} && (!trigger || trigger.textContent.includes('Custom'))) {
+          // Old backends show a native Custom effort control for a model set
+          // in config.toml but absent from their catalog. Verify the outgoing
+          // tier below instead of expecting the known-model compact icon.
+          return Array.from(document.querySelectorAll('button')).some(e => e.checkVisibility() &&
+            e.textContent.includes('Select effort') && e.textContent.includes('Custom'));
+        }
         if (!trigger || trigger.disabled || trigger.getAttribute('aria-disabled') === 'true') return false;
         const group = trigger.querySelector('[class*="ModelPickerTriggerModelLabel"]') ||
           trigger.querySelector('span.tabular-nums');
         const icon = trigger.querySelector('svg[class*="ModelPickerTriggerInlineModeIcon"]') || group?.querySelector('svg');
-        return Boolean(icon) === ${tier === 'Fast'};
+        return Boolean(icon) === ${tier !== 'Standard'};
       })()`), `${tier} composer selection`);
       const count = requests.filter(item => item.model === model).length;
       await cdp.call('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13 }, session);
       await cdp.call('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13 }, session);
       await until(() => requests.filter(item => item.model === model).length > count, `${tier} request`);
       const request = requests.filter(item => item.model === model).at(-1);
-      if (request.service_tier !== (tier === 'Fast' ? 'priority' : null)) {
+      if (request.service_tier !== tiers[tier]) {
         onProgress({ phase: 'unexpected-tier', tier, requests });
         throw new Error(`Incorrect ${tier} request tier.`);
       }
@@ -283,9 +295,13 @@ async function healthCheck(app, { onProgress = () => {}, screenshot, model: requ
         fs.writeFileSync(path.join(dir, `${name}-failure.png`), Buffer.from(shot.data, 'base64'));
       } catch {}
     }
-    if (process.platform === 'win32') {
-      const log = path.join(root, 'app.log');
-      if (fs.existsSync(log)) onProgress({ phase: 'startup-log', tail: fs.readFileSync(log, 'utf8').slice(-4000) });
+    const log = path.join(root, 'app.log');
+    if (fs.existsSync(log)) {
+      if (screenshot) {
+        const { dir, name } = path.parse(screenshot);
+        fs.copyFileSync(log, path.join(dir, `${name}-failure.log`));
+      }
+      onProgress({ phase: 'startup-log', tail: fs.readFileSync(log, 'utf8').slice(-6000) });
     }
     throw error;
   } finally {
