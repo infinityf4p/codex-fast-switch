@@ -82,4 +82,42 @@ $script:registeredVersion = '26.1007.2314.0'
 $script:signatureFailure = $true
 Rejects { Install-OfficialPackage } 'Windows signature validation failed'
 Assert ($script:registeredVersion -eq '26.1007.2314.0') 'Signature failure must preserve the registered app'
+
+# Exercise the Store fallback without installing anything on the CI host.
+$script:storeExitCode = -1978335189
+$script:storeInstalls = $false
+$script:storeCalls = 0
+$script:hasAppInstaller = $true
+$fakeWinget = Join-Path $Temporary 'winget.exe'
+[IO.File]::WriteAllBytes($fakeWinget, [byte[]]@())
+function Get-AppxPackage {
+    param($Name)
+    if ($Name -eq 'Microsoft.DesktopAppInstaller') {
+        if ($script:hasAppInstaller) { return @{ PackageFamilyName = 'Microsoft.DesktopAppInstaller_8wekyb3d8bbwe'; Status = 'Ok'; IsDevelopmentMode = $false; InstallLocation = $Temporary } }
+        return
+    }
+    @{ PackageFamilyName = $family; Publisher = $publisher; IsDevelopmentMode = $false; Status = 'Ok'; Version = $script:registeredVersion }
+}
+function Invoke-StoreUpgrade([string]$winget) {
+    Assert ($winget -ceq $fakeWinget) 'Must use the registered Microsoft App Installer'
+    $script:storeCalls++
+    if ($script:storeInstalls) { $script:registeredVersion = $data.version }
+    return @{ exitCode = $script:storeExitCode; detail = 'Store fixture result' }
+}
+$result = Install-StorePackage
+Assert ($result.status -eq 'pending' -and $script:storeCalls -eq 1) 'A staged rollout is pending, not an installed update'
+Assert ($script:registeredVersion -eq '26.1007.2314.0') 'Pending publication must preserve the old app'
+$script:hasAppInstaller = $false
+$result = Install-StorePackage
+Assert ($result.status -eq 'pending' -and $result.reason -eq 'store-unavailable') 'No App Installer must preserve the current app'
+$script:hasAppInstaller = $true
+$script:storeExitCode = 5
+Rejects { Install-StorePackage } 'Store exit code: 5'
+$script:storeInstalls = $true
+$script:storeExitCode = 0
+$result = Install-StorePackage
+Assert ($result.status -eq 'installed' -and $script:registeredVersion -eq $data.version) 'Must observe the registered Store update'
+$calls = $script:storeCalls
+$result = Install-StorePackage
+Assert ($script:storeCalls -eq $calls) 'Already registered update must not invoke Store again'
 Write-Output 'Official package validation and deployment checks passed.'

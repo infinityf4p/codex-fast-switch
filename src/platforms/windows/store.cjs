@@ -9,7 +9,7 @@ const { patchArchive, sha256 } = require('../../core/archive.cjs');
 const { saveJson, readJson, withLock } = require('../../core/state.cjs');
 
 const PATCH_ID = 'codex-fast-switch-windows-v1';
-const PATCH_REVISION = 12;
+const PATCH_REVISION = 13;
 const configPath = state => path.join(state, 'windows.json');
 const activePath = state => path.join(state, 'windows-active.json');
 const statusPath = state => path.join(state, 'windows-status.json');
@@ -100,10 +100,13 @@ async function install(source, state, { onPhase = () => {}, verify = platform.ve
   }
   onPhase('recognizing');
   const id = `${Date.now()}-${crypto.randomUUID()}`;
-  let prepared;
+  let prepared, backendCatalog;
   try {
     prepared = await plan(platform.archivePath(source));
     prepared.targets = [...prepared.targets, ...await planUpdater(platform.archivePath(source), { state, id })];
+    if (prepared.targets.some(t => t.kinds?.includes('api-ultrafast-backend'))) {
+      backendCatalog = require('../../core/backend-catalog.cjs').prepare(source, 'win32');
+    }
   } catch (error) {
     if (!error.code) error.code = 'UNSUPPORTED_PATCH';
     throw error;
@@ -130,7 +133,7 @@ async function install(source, state, { onPhase = () => {}, verify = platform.ve
       });
     }
     if (prepared.targets.some(t => t.kinds?.includes('api-ultrafast-backend'))) {
-      record.backendServiceTiers = require('../../core/backend-catalog.cjs').copy(source, app, 'win32');
+      record.backendServiceTiers = require('../../core/backend-catalog.cjs').copy(source, app, 'win32', backendCatalog);
     }
     record.integrity = integrity.patch(app, originalHeader);
     record.patched = platform.fingerprint(app);
@@ -174,6 +177,7 @@ function restore(state, { stopped = platform.assertStopped } = {}) {
 async function doctor(source) {
   const info = platform.verify(source);
   const prepared = await planArchive(platform.archivePath(source));
+  if (prepared.targets.some(t => t.kinds?.includes('api-ultrafast-backend'))) require('../../core/backend-catalog.cjs').prepare(source, 'win32');
   const targets = [...prepared.targets, ...updater.planArchive(platform.archivePath(source), {})];
   return { status: 'recognized', app: source, ...info, mode: 'local-copy', originalUnchanged: true, gateCases: prepared.checks.length,
     compatibility: prepared.compatibility || { nativeAppearance: false },

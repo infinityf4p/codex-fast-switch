@@ -22,11 +22,13 @@ module.exports = function createUpdater(manager, binding, dependencies = {}) {
     storeDetail: '\u53ef\u5728 Microsoft Store \u67e5\u770b\u662f\u5426\u6709\u66f4\u65b0\u7684\u5b98\u65b9\u7248\u672c\u3002',
     officialCurrent: '官方版本已同步',
     pending: '官方更新尚未提供可自动安装的下载包，请稍后重试。也可以在 Microsoft Store 中检查更新。',
+    pendingTitle: '官方更新正在发布',
     unknown: '暂时无法检查官方更新', unknownDetail: '无法连接官方更新源。请检查网络，或在 Microsoft Store 中检查更新。',
   } : { failed: 'Update did not complete', current: 'The installed Codex version is up to date',
     store: 'Open Microsoft Store', close: 'Close', storeDetail: 'Check Microsoft Store for a newer official version.',
     officialCurrent: 'The official version is up to date',
     pending: 'The published official update does not have an automatic download yet. Retry later or check Microsoft Store.',
+    pendingTitle: 'The official update is still being published',
     unknown: 'Could not check official updates', unknownDetail: 'The official update feed could not be reached. Check your connection or check for updates in Microsoft Store.' };
   const showError = error => dialog.showMessageBox({ type: 'error', title: words.failed,
     message: words.failed, detail: error.message || String(error), buttons: [words.close] });
@@ -62,9 +64,10 @@ module.exports = function createUpdater(manager, binding, dependencies = {}) {
       } else if (manual && !ready) {
         const unknown = result.official?.status === 'unknown';
         const current = result.official?.status === 'current';
+        const pending = result.official?.status === 'pending';
         const response = await dialog.showMessageBox({ type: unknown ? 'warning' : 'info',
-          message: unknown ? words.unknown : current ? words.officialCurrent : words.current,
-          detail: unknown ? words.unknownDetail : current ? result.official.installedVersion : words.storeDetail,
+          message: unknown ? words.unknown : pending ? words.pendingTitle : current ? words.officialCurrent : words.current,
+          detail: unknown ? words.unknownDetail : pending ? words.pending : current ? result.official.installedVersion : words.storeDetail,
           buttons: [words.store, words.close], defaultId: 1, cancelId: 1 });
         if (response.response === 0) await shell.openExternal(storeUrl);
       }
@@ -131,9 +134,10 @@ module.exports = function createUpdater(manager, binding, dependencies = {}) {
       }
       if (!result.available) {
         setReady(false); manager.setUpdateLifecycleState('idle');
-        if (result.official?.status === 'unknown') {
-          const response = await dialog.showMessageBox({ type: 'warning', message: words.unknown,
-            detail: words.unknownDetail, buttons: [words.store, words.close], defaultId: 1, cancelId: 1 });
+        if (['unknown', 'pending'].includes(result.official?.status)) {
+          const pending = result.official.status === 'pending';
+          const response = await dialog.showMessageBox({ type: pending ? 'info' : 'warning', message: pending ? words.pendingTitle : words.unknown,
+            detail: pending ? words.pending : words.unknownDetail, buttons: [words.store, words.close], defaultId: 1, cancelId: 1 });
           if (response.response === 0) await shell.openExternal(storeUrl);
         }
         return false;

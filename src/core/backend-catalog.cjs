@@ -5,9 +5,9 @@ const FILE = 'codex-fast-service-tiers.json';
 const supported = new Set(['gpt-6.2-sol', 'gpt-6.2-astra', 'gpt-6.1-sol', 'gpt-6-astra']);
 
 function extract(bytes) {
-  const marker = Buffer.from('{\n  "models": [');
+  const markers = ['{\n  "models": [', '{\r\n  "models": ['].map(value => Buffer.from(value));
   const catalogs = [];
-  for (let start = bytes.indexOf(marker); start !== -1; start = bytes.indexOf(marker, start + marker.length)) {
+  for (const marker of markers) for (let start = bytes.indexOf(marker); start !== -1; start = bytes.indexOf(marker, start + marker.length)) {
     let depth = 0, quoted = false, escaped = false, end;
     for (let i = start; i < Math.min(bytes.length, start + 8 * 1024 * 1024); i++) {
       const c = bytes[i];
@@ -59,15 +59,21 @@ function supplement(original) {
   return catalog;
 }
 
-function copy(source, destination, platform) {
+function prepare(source, platform) {
   const resources = platform === 'win32' ? 'resources' : 'Contents/Resources';
   const candidates = platform === 'win32' ? ['codex.exe'] : ['codex-cli/CodexCLI.app/Contents/MacOS/codex', 'codex'];
   const binary = candidates.map(p => path.join(source, resources, p)).find(p => fs.existsSync(p) && fs.statSync(p).isFile());
   if (!binary) throw new Error('Bundled backend unavailable for speed metadata.');
   const catalog = supplement(extract(fs.readFileSync(binary)));
   const data = Buffer.from(JSON.stringify(catalog));
-  fs.writeFileSync(path.join(destination, resources, FILE), data);
-  return { sha256: sha256(data), models: catalog.models.filter(m => supported.has(m.slug)).map(m => m.slug) };
+  return { data, models: catalog.models.filter(m => supported.has(m.slug)).map(m => m.slug) };
 }
 
-module.exports = { FILE, extract, supplement, copy };
+function copy(source, destination, platform, prepared = prepare(source, platform)) {
+  const resources = platform === 'win32' ? 'resources' : 'Contents/Resources';
+  const { data, models } = prepared;
+  fs.writeFileSync(path.join(destination, resources, FILE), data);
+  return { sha256: sha256(data), models };
+}
+
+module.exports = { FILE, extract, supplement, prepare, copy };

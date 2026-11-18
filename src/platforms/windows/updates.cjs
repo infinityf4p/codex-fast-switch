@@ -86,10 +86,16 @@ function check(state, id, { resolve = store.resolveSource, metadata = platform.m
     failure: job?.status === 'failed' && job.fromId === id ? { id: job.id, error: job.error } : null };
 }
 
-function checkForUpdates(state, id, { force = false, localCheck = check,
+function checkForUpdates(state, id, { force = false, now = Date.now, localCheck = check,
   officialCheck = require('./store-catalog.cjs').check } = {}) {
   const local = localCheck(state, id);
-  const official = officialCheck(state, local.source, { force });
+  let official = officialCheck(state, local.source, { force });
+  const pending = store.readOptional(path.join(state, 'windows-official-update.json'));
+  const age = now() - pending?.checkedAt;
+  if (official.status === 'available' && pending?.phase === 'pending' &&
+      pending.result?.pendingVersion === official.version && age >= 0 && age < 5 * 60 * 1000) {
+    official = { ...official, status: 'pending', reason: pending.result.reason };
+  }
   return { ...local, localAvailable: local.available, official,
     available: local.available || official.status === 'available' };
 }

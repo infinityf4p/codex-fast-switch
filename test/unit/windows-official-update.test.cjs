@@ -66,6 +66,26 @@ test('official installation verifies Windows registration, re-resolves the path 
   await assert.rejects(official.install('state', target, { ...options, execute: async () => ({ status: 'installed' }) }), /not registered/);
 });
 
+test('unpublished CDN and Store packages retain the verified installation without claiming an upgrade', async () => {
+  let installed = { app: path.resolve('official'), arch: 'x64', version: '26.915.4065.0' };
+  const options = { realpath: x => x, native: action => action === 'official-feed' ? feed : { packages: [installed] },
+    execute: async () => ({ status: 'pending', reason: 'not-published' }) };
+  const result = await official.install('state', installed.app, options);
+  assert.deepEqual(result, { status: 'current', version: installed.version, source: installed.app,
+    pendingVersion: feed.buildVersion, reason: 'not-published' });
+  const previous = installed;
+  const concurrent = await official.install('state', installed.app, { ...options, execute: async () => {
+    installed = { ...installed, version: feed.buildVersion };
+    return { status: 'pending' };
+  } });
+  assert.equal(concurrent.status, 'installed');
+  installed = previous;
+  await assert.rejects(official.install('state', installed.app, { ...options, execute: async () => {
+    installed = { ...installed, version: '1.0.0.0' };
+    return { status: 'pending' };
+  } }), /lost the registered/);
+});
+
 test('official download holds the shared installation lock and saves progress and failure for cleanup', async t => {
   const state = fs.mkdtempSync(path.join(os.tmpdir(), 'codex-fast-official-'));
   t.after(() => fs.rmSync(state, { recursive: true, force: true }));
@@ -90,6 +110,10 @@ test('official download holds the shared installation lock and saves progress an
   await official.update(state, 'copy-id', options);
   assert.equal(store.readOptional(official.statusPath(state)).phase, 'complete');
   assert.deepEqual(store.readOptional(store.configPath(state)), { autoDiscover: false, source: 'official-new', enabled: true });
+  options.installOfficial = async () => ({ status: 'current', version: '26.915.4065.0', pendingVersion: feed.buildVersion });
+  await official.update(state, 'copy-id', options);
+  assert.equal(store.readOptional(official.statusPath(state)).phase, 'pending');
+  assert.equal(store.readOptional(official.statusPath(state)).result.pendingVersion, feed.buildVersion);
 });
 
 test('installer transport handles split UTF-8 progress, native errors and timeouts', async () => {

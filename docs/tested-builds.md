@@ -1,5 +1,15 @@
 # Tested builds
 
+## 2026-11-18: Windows Ultrafast and unavailable official downloads
+
+Revision **13** prepared an isolated copy of Windows app **26.1111.21308 (27194)** from official Store package **26.1111.2228.0**, passing **450 executed gate checks**. The Windows backend embeds its catalog with CRLF line endings; both CRLF and LF catalogs are now recognized, and invalid catalogs fail compatibility checks before copying or requesting Quit. Preparation took **93.6 seconds**. Source and candidate signatures were checked through the native helper separately, ASAR integrity and final fingerprints passed, and the official source remained unchanged. This candidate was not registered or launched; the running personal copy was retained.
+
+The real bundled Windows app-server ran with a separate temporary profile, dummy API key and loopback Responses server. The production backend-launch adapter supplied its generated catalog. Each of `gpt-6.2-sol`, `gpt-6.2-astra` and `gpt-6.1-sol` completed Standard, Fast and Ultrafast requests: outgoing `service_tier` was omitted, `priority` and `ultrafast`, respectively. All nine replies completed with reasoning effort `low`. This verifies backend parameters, not the live Windows menu, provider acceptance, speed or billing. The 6.2 metadata template limitation described below still applies.
+
+The official feed announced **26.1111.9265.0**, but its `ChatGPT-x64.msix` URL returned **404 BlobNotFound**. The registered Microsoft App Installer's WinGet also reported no applicable upgrade (`0x8A15002B`). The fallback retains the verified installed version and reports pending publication instead of claiming an upgrade. Regressions cover Store success/failure, actual package registration, publication backoff, informational dialogs and continuing an independent local patch update.
+
+The complete suite passed **255 tests**, with **11 platform-specific skips** and **0 failures**. After adding the metadata preflight regression, all **16 Windows installation tests** passed, including that new case. Windows build and PowerShell syntax checks passed. These checks do not establish a successful download of the not-yet-available official package or a full update/relaunch cycle.
+
 ## 2026-11-18: Ultrafast and configured GPT-6.2 models
 
 macOS patch revision 14 was tested in an isolated copy of **26.1103.32239 (25471)**, with a separate profile, dummy key and loopback Responses server. Native Speed menu selections produced these completed conversation requests (title requests excluded):

@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Windows patch revision 13 reads both LF and CRLF bundled model metadata, checks it before the update handoff, and reuses the shared Ultrafast adapters. On official CDN HTTP 404/410, try the registered Microsoft Store product through WinGet, then confirm Windows' actual package version. If neither channel has published the target, preserve the installed version and report pending publication, with a five-minute retry interval that does not block local patch updates.
+
 - macOS revision 14 / Windows revision 12 add Ultrafast support for reviewed Rspack builds. Supply a separate speed catalog only to bundled local API-key backends, preserving OAuth, custom CLI commands and explicit catalogs. Keep the visible model list unchanged except for the model explicitly selected in configuration. Hidden GPT-6.2 metadata uses the bundled preceding-family template until native metadata is available. Verify that requested Ultrafast survives the renderer, main process and backend instead of being silently omitted.
 
 - Windows patch revision 11 supports Store package 26.1111.2228.0 / app 26.1111.21308 (27194). Reuse the Rspack UI adapter and add reviewed Windows main-process request and saved-speed variants. Recognize the newer native updater's complete interface, preserve its readiness and operation arguments, and return explicit install success/failure. Keep the native compact picker, full model names, Default presets and filled Fast icons.

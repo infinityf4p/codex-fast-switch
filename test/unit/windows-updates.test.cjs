@@ -141,6 +141,56 @@ test('a catalog-only version without a released download does not begin a spurio
   assert.match(f.dialogs[0].detail, /does not have an automatic download/);
 });
 
+test('publication delay shows an informational message without quitting or claiming the app is current', async t => {
+  const f = clientFixture(t);
+  f.setResponse({ available: true, localAvailable: false, official: { status: 'available' } });
+  const operation = f.client.installUpdatesIfAvailable();
+  await new Promise(resolve => setImmediate(resolve));
+  f.setResponse({ available: false, localAvailable: false, official: { status: 'pending' } });
+  f.official.complete({ status: 'current', pendingVersion: '26.1111.9265.0' });
+  assert.equal(await operation, false);
+  assert.equal(f.helper, null);
+  assert.equal(f.client.getIsUpdateReady(), false);
+  assert.equal(f.dialogs.at(-1).type, 'info');
+  assert.match(f.dialogs.at(-1).message, /still being published/);
+  assert.equal(f.events.some(e => e[0] === 'quit'), false);
+  await f.client.checkForUpdates();
+  assert.match(f.dialogs.at(-1).message, /still being published/);
+});
+
+test('a publication delay does not block an independently available local patch', async t => {
+  const f = clientFixture(t);
+  f.setResponse({ available: true, localAvailable: true, official: { status: 'pending' } });
+  const operation = f.client.installUpdatesIfAvailable();
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(f.official, null);
+  f.helper.setStatus({ status: 'ready' });
+  assert.equal(await operation, true);
+  assert.deepEqual(f.events.slice(-2), [['prepare'], ['quit']]);
+  assert.deepEqual(f.dialogs, []);
+});
+
+test('publication backoff is bounded to the observed version and never hides a local patch', t => {
+  const state = fs.mkdtempSync(path.join(os.tmpdir(), 'codex-fast-pending-'));
+  t.after(() => fs.rmSync(state, { recursive: true, force: true }));
+  store.saveJson(path.join(state, 'windows-official-update.json'), {
+    phase: 'pending', checkedAt: 1000, result: { pendingVersion: '26.1111.9265.0', reason: 'not-published' },
+  });
+  for (const localAvailable of [false, true]) {
+    const options = { force: true, now: () => 1001,
+      localCheck: () => ({ available: localAvailable, source: 'official' }),
+      officialCheck: () => ({ status: 'available', version: '26.1111.9265.0' }) };
+    let result = updates.checkForUpdates(state, 'id', options);
+    assert.equal(result.official.status, 'pending');
+    assert.equal(result.available, localAvailable);
+    result = updates.checkForUpdates(state, 'id', { ...options, now: () => 301000 });
+    assert.equal(result.official.status, 'available');
+    result = updates.checkForUpdates(state, 'id', { ...options,
+      officialCheck: () => ({ status: 'available', version: '26.1112.0.0' }) });
+    assert.equal(result.official.status, 'available');
+  }
+});
+
 test('a manual offline Store check never claims the official app is current', async t => {
   const f = clientFixture(t);
   f.setResponse({ available: false, localAvailable: false, official: { status: 'unknown' } });

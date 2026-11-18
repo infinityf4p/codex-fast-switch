@@ -113,6 +113,18 @@ test('Windows install publishes a verified copy, preserves the source, and resto
   assert.equal(store.restore(f.state, f.options).status, 'already-original');
 });
 
+test('Windows rejects unknown backend speed metadata before copying or publishing an app', async t => {
+  const f = await fixture(t);
+  let copied = false;
+  await assert.rejects(f.install({
+    plan: async () => ({ targets: [{ kinds: ['api-ultrafast-backend'] }], checks: [] }),
+    copy: () => { copied = true; },
+  }), error => error.code === 'UNSUPPORTED_PATCH' && /bundled model metadata/.test(error.message));
+  assert.equal(copied, false);
+  assert.equal(store.checkedActive(f.state), null);
+  assert.equal(fs.existsSync(path.join(f.state, 'versions')), false);
+});
+
 test('Windows archive hashes must match the executable resource and duplicate resources fail closed', async t => {
   const f = await fixture(t);
   integrity.verify(f.source);

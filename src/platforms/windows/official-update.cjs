@@ -53,9 +53,17 @@ async function install(state, source, { native = platform.native, realpath = fs.
   const progress = value => onProgress({ ...value, targetVersion: target.version });
   const result = await execute({ ...target, state: path.resolve(state), installedVersion: installed.version }, progress);
   // The external installer result alone is insufficient: confirm Windows' registration.
-  const registered = native('store-context').packages.find(item => item.arch === installed.arch &&
-    version(item.version) >= version(target.version));
-  if (!registered || result.status !== 'installed') throw new Error('Windows has not registered the downloaded official update.');
+  const packages = native('store-context').packages;
+  const registered = packages.find(item => item.arch === installed.arch && version(item.version) >= version(target.version));
+  if (!registered && result.status === 'pending') {
+    const current = packages.find(item => item.arch === installed.arch && version(item.version) >= version(installed.version));
+    if (!current) throw new Error('Windows lost the registered official package while waiting for publication.');
+    // Keep the current protocol usable by already installed updater clients.
+    // This describes the retained installation, not a successful upgrade.
+    return { status: 'current', version: current.version, source: realpath(current.app),
+      pendingVersion: target.version, reason: result.reason };
+  }
+  if (!registered || !['installed', 'pending'].includes(result.status)) throw new Error('Windows has not registered the downloaded official update.');
   return { status: 'installed', version: registered.version, source: realpath(registered.app) };
 }
 
@@ -76,7 +84,7 @@ async function update(state, id, { installOfficial = install, resolve = store.re
         // including when the user originally selected that package with --app.
         const config = store.readOptional(store.configPath(state));
         if (updated.source && config) store.saveJson(store.configPath(state), { ...config, source: updated.source });
-        save({ phase: 'complete', result: updated });
+        save({ phase: updated.pendingVersion ? 'pending' : 'complete', result: updated });
         return updated;
       } catch (error) { save({ phase: 'failed', error: error.message }); throw error; }
     });

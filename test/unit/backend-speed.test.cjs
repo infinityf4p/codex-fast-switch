@@ -15,6 +15,9 @@ const binary = catalog => Buffer.from(`binary-prefix\0${JSON.stringify(catalog, 
 
 test('backend metadata extraction handles quoted braces and rejects missing, truncated or divergent catalogs', () => {
   assert.deepEqual(extract(binary(fixture())), fixture());
+  const windows = Buffer.from(binary(fixture()).toString().replaceAll('\n', '\r\n'));
+  assert.deepEqual(extract(windows), fixture());
+  assert.deepEqual(extract(Buffer.concat([binary(fixture()), windows])), fixture());
   assert.deepEqual(extract(Buffer.concat([binary(fixture()), binary(fixture())])), fixture());
   assert.throws(() => extract(Buffer.from('none')), /Missing/);
   assert.throws(() => extract(Buffer.from('{\n  "models": [ { "slug": "unfinished"')), /Incomplete/);

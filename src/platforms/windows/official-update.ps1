@@ -107,6 +107,41 @@ function Install-OfficialPackage {
     if ([version]$registered.Version -lt [version]$data.version) { throw 'Windows did not activate the official update.' }
 }
 
+function Invoke-StoreUpgrade([string]$winget) {
+    $details = & $winget upgrade --id 9PLM9XGG6VKS --source msstore --exact --silent --disable-interactivity --accept-source-agreements --accept-package-agreements 2>&1
+    return @{ exitCode = $LASTEXITCODE; detail = ($details | Out-String).Trim() }
+}
+
+function Install-StorePackage {
+    $registered = Get-OfficialPackage
+    if ([version]$registered.Version -ge [version]$data.version) { return @{ status = 'installed'; version = $registered.Version.ToString() } }
+    Assert-OfficialWindowStopped
+    $installers = @(Get-AppxPackage -Name Microsoft.DesktopAppInstaller | Where-Object {
+        $_.PackageFamilyName -ceq 'Microsoft.DesktopAppInstaller_8wekyb3d8bbwe' -and $_.Status -eq 'Ok' -and -not $_.IsDevelopmentMode
+    })
+    if ($installers.Count -ne 1) {
+        return @{ status = 'pending'; version = $registered.Version.ToString(); reason = 'store-unavailable' }
+    }
+    $winget = Join-Path $installers[0].InstallLocation 'winget.exe'
+    if (-not (Test-Path -LiteralPath $winget -PathType Leaf)) { throw 'Microsoft App Installer is missing winget.exe. Repair it or update ChatGPT in Microsoft Store.' }
+    Send-Progress @{ phase = 'installing-official'; source = 'microsoft-store' }
+    # Target only the already installed official product. Windows/Store performs
+    # signature and licensing checks; never uninstall first or update other apps.
+    $result = Invoke-StoreUpgrade $winget
+    $registered = Get-OfficialPackage
+    if ([version]$registered.Version -lt [version]$data.version) {
+        # APPINSTALLER_CLI_ERROR_UPDATE_NOT_APPLICABLE means the Store rollout
+        # has not reached this installation either. Keep the current app usable.
+        if ($result.exitCode -in @(0, -1978335189)) {
+            return @{ status = 'pending'; version = $registered.Version.ToString(); reason = 'not-published' }
+        }
+        $detail = $result.detail
+        if ($detail.Length -gt 2048) { $detail = $detail.Substring($detail.Length - 2048) }
+        throw ('Microsoft Store could not install the official update. Store exit code: ' + $result.exitCode + '. ' + $detail)
+    }
+    return @{ status = 'installed'; version = $registered.Version.ToString(); source = 'microsoft-store' }
+}
+
 $packageFile = $null
 $partialFile = $null
 $elevationFile = $null
@@ -159,6 +194,12 @@ try {
         try {
             Send-Progress @{ phase = 'downloading'; percent = 0 }
             $response = $client.GetAsync($uri, [Net.Http.HttpCompletionOption]::ResponseHeadersRead).GetAwaiter().GetResult()
+            # The release feed can lead publication of the CDN blob. Retry via
+            # the official Store instead of showing the raw HTTP 404 exception.
+            if ([int]$response.StatusCode -in @(404, 410)) {
+                Send-Progress @{ result = (Install-StorePackage) }
+                exit 0
+            }
             $response.EnsureSuccessStatusCode() | Out-Null
             $total = $response.Content.Headers.ContentLength
             if ($null -ne $total -and ($total -le 0 -or $total -gt 8GB)) { throw 'The official package is oversized.' }
