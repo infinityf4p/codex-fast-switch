@@ -45,6 +45,10 @@
         "module": "6286",
         "fingerprint": "e6b4303341317116183065061508cd14a0f9d74b9e042e58f8d82f91476d6568",
         "patchedFingerprint": "eb18890009d342b87a33b7d18cbdddb90461d8a76b1246fc5a4df95e2a6d953e"
+      },
+      {
+        "module": "22423",
+        "fingerprint": "c3d18f5f2ca12796493724ac664a87e24441c567407c75b68c26da890bac1b10"
       }
     ]
   },
@@ -82,6 +86,10 @@
         "module": "6286",
         "fingerprint": "7f531ec33f4417a5ea1ad19fe3f966128c83e0693a4359f8f186974986ca178c",
         "patchedFingerprint": "cc01d5da8bb47eed2b9d3cfbbf997defd5e243d8696030a1a81ca574c6cd1caf"
+      },
+      {
+        "module": "22423",
+        "fingerprint": "0c11b76a396f65fc5d376d6680656697618de20840fd4cf57e8b40d45fbb9950"
       }
     ]
   },

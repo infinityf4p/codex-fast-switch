@@ -1,5 +1,15 @@
 # Tested builds
 
+## 2026-11-20: macOS 29030 compatibility
+
+Official app **26.1111.71704 (29030)** was left unpatched after the existing worker reported `Missing Rspack saved-request module 71817 in main.` Both main-process speed functions retain their reviewed fingerprints but now live in module `22423`. The added module aliases preserve the existing transforms and reject unknown function bodies.
+
+The archive passed **498 executed gate checks** and planned **31 ASAR entry edits**. An isolated, signed copy with a dummy API key and loopback Responses server completed three `gpt-6.2-sol` replies at reasoning effort `low`: Ultrafast sent `ultrafast`, Fast sent `priority`, and Standard omitted the tier. Deep signature verification and the existing Electron-integrity handling passed; the personal app's fingerprints remained unchanged. The Storage bridge loaded using an isolated dummy helper with other Keychain reads denied. This does not claim a fresh real Storage Key authorization or a full official-update cycle.
+
+The completed request run subsequently failed a test-only assertion that expected the Storage helper's last status to be `read`; it was `loaded`. Three additional fresh-profile launches timed out at the splash screen, including attempts reusing public runtime files; one cold launch spent about 107 seconds installing the official runtime. Their backend initialized, but these are not successful UI runs. Fresh-profile startup reliability remains unresolved; this record does not present every integration attempt as passing.
+
+Source checks and the local suite passed **242 tests**, with **25 platform-specific skips** and **0 failures**. macOS patch revision remains **14** because only recognition aliases changed; the Windows runtime was not tested in this round. These loopback requests verify outgoing tiers, not provider speed or billing.
+
 ## 2026-11-18: Windows Ultrafast and unavailable official downloads
 
 Revision **13** prepared an isolated copy of Windows app **26.1111.21308 (27194)** from official Store package **26.1111.2228.0**, passing **450 executed gate checks**. The Windows backend embeds its catalog with CRLF line endings; both CRLF and LF catalogs are now recognized, and invalid catalogs fail compatibility checks before copying or requesting Quit. Preparation took **93.6 seconds**. Source and candidate signatures were checked through the native helper separately, ASAR integrity and final fingerprints passed, and the official source remained unchanged. This candidate was not registered or launched; the running personal copy was retained.
