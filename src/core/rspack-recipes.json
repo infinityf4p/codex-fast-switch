@@ -34,7 +34,6 @@
   {
     "kind": "api-ultrafast-backend",
     "entry": ".vite/build/app-server-host.js",
-    "platform": "win32",
     "scope": "main",
     "fingerprint": "367753a50aa6726f425d569d65d074d942b1bf50459b9098ab40a2d4bdc7eae6",
     "patchedFingerprint": "4aba30a74fda02038ce9d2ce1a0a7a855c95cd97dc41e3e5a3236993cbd6eb37"

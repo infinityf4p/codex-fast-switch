@@ -210,18 +210,17 @@ function isRspack(archive, files) {
 
 async function planArchive(archive, files) {
   const entries = [];
-  const recipes = defaultRecipes.filter(recipe => !recipe.platform || recipe.platform === process.platform);
   for (const file of files) {
     const entryPath = file.replaceAll('\\', '/');
     const info = asar.statFile(archive, file);
     if (info.unpacked || info.link || info.size > 32 * 1024 * 1024) {
-      if (recipes.some(recipe => recipe.entry === entryPath)) throw new Error(`Unsupported Rspack standalone entry: ${file}.`);
+      if (defaultRecipes.some(recipe => recipe.entry === entryPath)) throw new Error(`Unsupported Rspack standalone entry: ${file}.`);
       continue;
     }
     entries.push({ entry: file, scope: entryPath.startsWith('.vite/') ? 'main' : 'webview',
       source: asar.extractFile(archive, file).toString('utf8') });
   }
-  return plan(entries, recipes);
+  return plan(entries);
 }
 
 module.exports = { modules, collect, transform, plan, validate, isRspack, planArchive };
