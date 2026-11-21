@@ -1,5 +1,15 @@
 # Tested builds
 
+## 2026-11-21: Windows 29803 compatibility with native GPT-6.2 models
+
+The official Windows app had already updated to Store package **26.1117.4957.0**, containing app **26.1117.41037 (29803)**. Patch preparation stopped on the changed `j44z` model-query module, leaving the existing **27194** copy usable. Revision **14** recognizes the changed backend launch, request/saved-speed functions in both process scopes, native picker and updater interface. Saved speed now delegates by conversation ID, preserving provider-aware lookup.
+
+The new backend already contains visible **GPT-6.2 Sol** and **GPT-6.2 Astra** entries. An isolated candidate passed **642 executed gate checks** and **28 ASAR entry edits**; preparation plus compatibility checks took **77.3 seconds** on this machine. All **12** native model-query factories were retained byte for byte. The catalog retained the exact model list and native 6.2 capabilities, only adding speed metadata. Patched-app signature and ASAR integrity checks passed, and source and personal active-copy fingerprints were unchanged. The candidate was not registered or launched as a desktop app.
+
+The candidate's real bundled app-server used a separate temporary profile, dummy API key and loopback Responses server. Both 6.2 models completed Standard, Fast and Ultrafast requests at reasoning effort `low`: their outgoing `service_tier` was omitted, `priority` and `ultrafast`, respectively. All six replies completed. These checks verify backend parameters, not a live Windows menu or provider speed, billing or acceptance. They do not establish a full native-button update/relaunch cycle for this build.
+
+The full local suite passed **259 tests**, with **11 platform-specific skips** and **0 failures**. Regressions cover preserving native model queries and capabilities, conversation-based saved-speed delegation, explicit tier selection and the reviewed updater's new callback. Windows build and PowerShell syntax checks passed.
+
 ## 2026-11-20: macOS 29030 compatibility
 
 Official app **26.1111.71704 (29030)** was left unpatched after the existing worker reported `Missing Rspack saved-request module 71817 in main.` Both main-process speed functions retain their reviewed fingerprints but now live in module `22423`. The added module aliases preserve the existing transforms and reject unknown function bodies.

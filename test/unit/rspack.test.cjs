@@ -1,8 +1,8 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const vm = require('node:vm');
-const { parse, shape } = require('../../src/core/adaptive.cjs');
-const { modules, collect, plan } = require('../../src/core/rspack.cjs');
+const { parse, shape, nodePath } = require('../../src/core/adaptive.cjs');
+const { modules, collect, plan, validate } = require('../../src/core/rspack.cjs');
 
 const source = 'function(name,{stripGptPrefix=false}={}){return stripGptPrefix?name.replace(/^GPT-/,""):name;}';
 const patched = 'function(name,{stripGptPrefix=false}={}){return name;}';
@@ -61,4 +61,41 @@ test('Rspack accepts reviewed module variants without ignoring an unknown copy o
   const changed = { ...older, source: older.source.replace('replace(', 'replaceAll(') };
   await assert.rejects(plan([changed, chunk('good')], variants), /Cannot recognize/);
   await assert.rejects(plan([older, chunk('bad', source.replace('replace(', 'replaceAll('))], variants), /Cannot recognize/);
+});
+
+test('a reviewed native model query is retained byte for byte while other lazy modules are patched', async () => {
+  const native = 'function(config){return {models:config.models,provider:config.provider};}';
+  const query = { kind: 'api-configured-model', module: 'Catalog', scope: 'webview', fingerprint: 'older-query',
+    compatibleVariants: [{ fingerprint: fingerprint(native), native: true, patchedFingerprint: fingerprint(native) }] };
+  const entry = chunk('native-catalog');
+  entry.source = entry.source.replace('Other(){return 42;}', `Catalog(m){m.exports=${native};}`);
+  const result = await plan([entry], [recipe, query]);
+  assert.equal(result.targets.length, 1);
+  assert.equal(result.targets[0].patched.toString(), entry.source.replace(source, patched));
+  await assert.rejects(plan([{ ...entry, source: entry.source.replace('config.provider', 'config.otherProvider') }],
+    [recipe, query]), /Cannot recognize Rspack api-configured-model/);
+});
+
+test('request validation preserves conversation-based saved speed and explicit Standard/Fast/Ultrafast selections', async () => {
+  const source = `function(client,saved){return async(conversationId,message)=>{
+    const options=message.submissionOptions;
+    const tier=await (async()=>{
+      if(null==options)return saved(conversationId);
+      if(null==options.serviceTier)return null;
+      const {account}=await client.getAccount({priority:'critical'});
+      return account?.type==='chatgpt'||account?.type==='amazonBedrock'||account?.type==='apiKey'?options.serviceTier:null;
+    })();
+    return {resume:{serviceTier:tier},start:{serviceTier:tier},steer:{serviceTier:tier}};
+  }}`;
+  const fn = parse(`(${source})`).body[0].expression;
+  let condition;
+  require('acorn-walk').simple(fn, { ConditionalExpression(node) { condition = node.test; } });
+  const recipe = { kind: 'request', savedScope: 'conversation', path: nodePath(fn, condition) };
+  const checks = await validate({ recipe, patchedFunction: source });
+  assert.equal(checks.length, 23);
+  assert.ok(checks.every(check => check.passed));
+  await assert.rejects(validate({ recipe, patchedFunction: source.replace('saved(conversationId)', 'saved("wrong")') }),
+    /Unknown saved-tier conversation argument/);
+  await assert.rejects(validate({ recipe, patchedFunction: source.replace('||account?.type===\'apiKey\'', '') }),
+    /request gate verification failed/);
 });

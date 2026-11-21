@@ -8,6 +8,8 @@ const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 const modern = fs.readFileSync(path.join(__dirname, '../fixtures/windows-updater-27194.js'), 'utf8');
+const recent = modern.replace('onInstallUpdatesAborted:',
+  'onIdleInstallRegistered:()=>this.onIdleWindowsInstallRegistered?.(),onInstallUpdatesAborted:');
 
 test('future signed runtime versions are accepted without a per-build hash list', () => {
   const files = ['ChatGPT.exe', 'chrome.dll', 'resources/codex.exe'];
@@ -74,7 +76,7 @@ test('unknown updater interfaces and ambiguous managers are not patched', () => 
 });
 
 test('the reviewed Rspack updater preserves native operations and changes only Windows initialization', () => {
-  for (const source of [modern, modern.replaceAll('"', "'").replaceAll('let ', 'let  ')]) {
+  for (const source of [modern, recent].flatMap(text => [text, text.replaceAll('"', "'").replaceAll('let ', 'let  ')])) {
     const patched = adapt(source, { state: 'state', id: 'generation' }, new Set()).toString();
     const methods = text => parse(text).body[0].body.body;
     const unchanged = text => methods(text).filter(m => m.key.name !== 'initializeWindowsUpdater').map(shape);
@@ -82,6 +84,7 @@ test('the reviewed Rspack updater preserves native operations and changes only W
     assert.match(patched, /this\.updater=/);
   }
   for (const changed of [
+    recent.replace('this.onIdleWindowsInstallRegistered?.()', 'this.quit()'),
     modern.replace('return this.isUpdateReady&&', 'return this.other&&'),
     modern.replace('await t.checkForUpdates(e)', 'await t.checkForUpdates()'),
     modern.replace('await n.installUpdatesIfAvailable(e,t)', 'await n.installUpdatesIfAvailable("auto",t)'),

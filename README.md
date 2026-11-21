@@ -8,6 +8,8 @@
 
 新 Rspack 版本还支持原生 **Ultrafast** 菜单，发送 `service_tier: "ultrafast"`。补丁同步本地 API Key 后端的速度元数据，避免旧后端把这个参数丢弃；适用于 GPT-6.1 Sol、GPT-6 Astra，以及在 `config.toml` 中选择的 GPT-6.2 Sol / Astra。其他未选择的新模型保持隐藏，OAuth 和已有自定义模型目录保持原有处理方式。服务商是否接受及实际处理档位仍由服务端决定。[官方 Ultrafast 说明](https://developers.openai.com/api/docs/guides/ultrafast-mode)
 
+已原生包含 GPT-6.2 Sol / Astra 的新版（Windows build 29803）保留官方模型列表和模型能力数据，无需额外添加模型；补丁只补充速度档位支持。
+
 ## 界面预览
 
 原生 Speed 菜单、展开的模型与推理强度菜单，以及收起后的会话模型控件：

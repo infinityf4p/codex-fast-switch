@@ -4,7 +4,14 @@
     "module": "j44z",
     "scope": "webview",
     "fingerprint": "04d5b1be0aa5e7d3c52dcde096be20721ba3bb82139da82552af1ed79b8d942c",
-    "patchedFingerprint": "e215f33415c219041a7290e0ec2382209998369b5696cc96560ad8e2bd5a4059"
+    "patchedFingerprint": "e215f33415c219041a7290e0ec2382209998369b5696cc96560ad8e2bd5a4059",
+    "compatibleVariants": [
+      {
+        "fingerprint": "e0f21940d778595bf7d2e47361cd0e35d6022ce2db7d231ee9912fb283f05af2",
+        "native": true,
+        "patchedFingerprint": "e0f21940d778595bf7d2e47361cd0e35d6022ce2db7d231ee9912fb283f05af2"
+      }
+    ]
   },
   {
     "kind": "api-ultrafast-backend",
@@ -16,6 +23,11 @@
       {
         "fingerprint": "90c5434a2a6614715eb356585d277ee6ee01a8ad70223e42001bc5224aeb51cc",
         "patchedFingerprint": "3c20e57f0ead86a49439c803ebc55a78568aaf66c96537a3842594868bab9e5f"
+      },
+      {
+        "module": "75895",
+        "fingerprint": "6c7b81c246c5258169b34d165a1e44567d60598163f0ef7f0c2ce1d0aa886d17",
+        "patchedFingerprint": "5cd7ac8cabbde62e1845732664bec0a7ca01a88435bc2b48cea3ed39b1fbcf23"
       }
     ]
   },
@@ -49,6 +61,11 @@
       {
         "module": "22423",
         "fingerprint": "c3d18f5f2ca12796493724ac664a87e24441c567407c75b68c26da890bac1b10"
+      },
+      {
+        "module": "89694",
+        "fingerprint": "9a56882aeb6bfa4cb3404646798e13936d6105c3b8b810572a402bd2ea3f6a9d",
+        "patchedFingerprint": "c6ad795bc60300cfef0373036f1130349b001773abfc108aa692c54cb139eb2a"
       }
     ]
   },
@@ -64,6 +81,11 @@
       {
         "module": "V7mA",
         "fingerprint": "c3d18f5f2ca12796493724ac664a87e24441c567407c75b68c26da890bac1b10"
+      },
+      {
+        "module": "H7KU",
+        "fingerprint": "8d1a0cad78ffc16242fec9fd263b3bc1512577e6b91ef68ceab7ce40856e4979",
+        "patchedFingerprint": "b7f1190870264ce1ed750e083c9c2b17e32b0ea270164636ae19c71cb21d22b1"
       }
     ]
   },
@@ -90,6 +112,12 @@
       {
         "module": "22423",
         "fingerprint": "0c11b76a396f65fc5d376d6680656697618de20840fd4cf57e8b40d45fbb9950"
+      },
+      {
+        "module": "89694",
+        "fingerprint": "6cb1b9c1490fbb29df6045e3eb42f2ed05ba6bf975af5a1a897fd78482253a35",
+        "savedScope": "conversation",
+        "patchedFingerprint": "3c17032084a7c127c783fad33d2810d7fb0aa33608b772138291dc8b02ebea44"
       }
     ]
   },
@@ -107,6 +135,12 @@
         "fingerprint": "0df1efa02dd544a330e32533e75dd9e873c1eedd1110eff28993273cca5ffe9e",
         "path": ["body","body",0,"argument","body","body",6,"declarations",0,"init","argument","arguments",0,"elements",0,"callee","body","body",3,"argument","test"],
         "patchedFingerprint": "f2bb8801e8ac3bc3304f7e86adf9091f633e990982c68c17c4ff839baefb2683"
+      },
+      {
+        "module": "H7KU",
+        "fingerprint": "a06e2ac5b6e35f96841c580ff4dbbcddecc358b8af9fbc4c667f0104fadaf78d",
+        "savedScope": "conversation",
+        "patchedFingerprint": "be394705a10da83d5e4b14434dd9a160983b0ec7097271ef6f310f0510f3a7a6"
       }
     ]
   },
@@ -138,6 +172,11 @@
         "module": "ivi7",
         "fingerprint": "49fb578981babc19acd947f46d9e7b357c07c6e18c115f3e07a4be9ea6aa47d7",
         "patchedFingerprint": "49fb578981babc19acd947f46d9e7b357c07c6e18c115f3e07a4be9ea6aa47d7"
+      },
+      {
+        "module": "w5vO",
+        "fingerprint": "d8c97bd9e5a40c4dc70b38f61b12f846325cb9ab455a3907b9741db5401174b4",
+        "patchedFingerprint": "d8c97bd9e5a40c4dc70b38f61b12f846325cb9ab455a3907b9741db5401174b4"
       }
     ]
   },
@@ -150,6 +189,10 @@
     "compatibleVariants": [
       {
         "module": "mmK4",
+        "fingerprint": "7230f312baabcc5a88f7b13521480d42ee6d644b1e8ed91a29673ea7c045049a"
+      },
+      {
+        "module": "w2sm",
         "fingerprint": "7230f312baabcc5a88f7b13521480d42ee6d644b1e8ed91a29673ea7c045049a"
       }
     ]
@@ -164,6 +207,11 @@
     "compatibleVariants": [
       {
         "module": "ivi7",
+        "fingerprint": "7aab8a5049062769b98f75dabe8808557a8b9ee2dc26d95a0fc0c585c84d780c",
+        "patchedFingerprint": "7aab8a5049062769b98f75dabe8808557a8b9ee2dc26d95a0fc0c585c84d780c"
+      },
+      {
+        "module": "w5vO",
         "fingerprint": "7aab8a5049062769b98f75dabe8808557a8b9ee2dc26d95a0fc0c585c84d780c",
         "patchedFingerprint": "7aab8a5049062769b98f75dabe8808557a8b9ee2dc26d95a0fc0c585c84d780c"
       }

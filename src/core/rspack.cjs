@@ -153,7 +153,10 @@ async function validate(match) {
     const statements = selector.body.body;
     const options = statements[0].test.right.name;
     const saved = statements[0].consequent.argument.callee.name;
-    const conversation = statements[0].consequent.argument.arguments[0].left.expression.object.name;
+    const savedArgument = statements[0].consequent.argument.arguments[0];
+    const byConversation = recipe.savedScope === 'conversation';
+    const conversation = byConversation ? savedArgument.name : savedArgument.left.expression.object.name;
+    if (byConversation && savedArgument.type !== 'Identifier') throw new Error('Unknown saved-tier conversation argument.');
     const client = statements[2].declarations[0].init.argument.callee.object.name;
     const code = `(${text.slice(selector.start, selector.end)})()`;
     for (const auth of ['apiKey', 'chatgpt', 'amazonBedrock', 'other', null]) for (const tier of ['priority', 'ultrafast', null, undefined]) {
@@ -165,8 +168,10 @@ async function validate(match) {
       checks.push({ kind: 'request', auth, tier: tier ?? null, passed: true });
     }
     for (const tier of ['priority', 'ultrafast', null]) {
-      const result = await run(code, { [options]: null, [conversation]: { latestModel: 'selected-model' },
-        [saved]: async model => { if (model !== 'selected-model') throw new Error('Saved model changed.'); return tier; } });
+      const expected = byConversation ? 'selected-conversation' : 'selected-model';
+      const result = await run(code, { [options]: null,
+        [conversation]: byConversation ? expected : { latestModel: expected },
+        [saved]: async value => { if (value !== expected) throw new Error('Saved-tier lookup argument changed.'); return tier; } });
       if (result !== tier) throw new Error('Rspack saved-tier delegation changed.');
       checks.push({ kind: 'request', saved: true, tier, passed: true });
     }

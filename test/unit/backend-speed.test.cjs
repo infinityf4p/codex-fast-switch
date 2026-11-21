@@ -44,6 +44,25 @@ test('an existing native 6.2 entry and its restrictions are retained', () => {
   assert.deepEqual(supplement(original).models.find(m => m.slug === 'gpt-6.2-sol'), original.models.at(-1));
 });
 
+test('a native 6.2 catalog only gains Ultrafast metadata without adding models or replacing native capabilities', () => {
+  const original = fixture();
+  original.models.push(...['gpt-6.2-sol', 'gpt-6.2-astra'].map(slug => ({ ...entry(slug),
+    visibility: 'list', default_service_tier: 'priority', context_window: 987654,
+    model_messages: { instructions_template: `Native instructions for ${slug}` } })));
+  const before = structuredClone(original), result = supplement(original);
+  assert.deepEqual(original, before);
+  assert.deepEqual(result.models.map(model => model.slug), before.models.map(model => model.slug));
+  for (const native of before.models.filter(model => model.slug.startsWith('gpt-6.2-'))) {
+    const model = result.models.find(model => model.slug === native.slug);
+    const { service_tiers, additional_speed_tiers, ...properties } = model;
+    assert.deepEqual(properties, Object.fromEntries(Object.entries(native).filter(([key]) =>
+      !['service_tiers', 'additional_speed_tiers'].includes(key))));
+    assert.deepEqual(service_tiers.slice(0, -1), native.service_tiers);
+    assert.equal(service_tiers.at(-1).id, 'ultrafast');
+    assert.deepEqual(additional_speed_tiers, [...native.additional_speed_tiers, 'ultrafast']);
+  }
+});
+
 test('catalog copy is separate from the signed backend binary', t => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'codex-backend-copy-'));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
