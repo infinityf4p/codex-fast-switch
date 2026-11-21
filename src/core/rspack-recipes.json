@@ -66,6 +66,11 @@
         "module": "89694",
         "fingerprint": "9a56882aeb6bfa4cb3404646798e13936d6105c3b8b810572a402bd2ea3f6a9d",
         "patchedFingerprint": "c6ad795bc60300cfef0373036f1130349b001773abfc108aa692c54cb139eb2a"
+      },
+      {
+        "module": "17408",
+        "fingerprint": "8d1a0cad78ffc16242fec9fd263b3bc1512577e6b91ef68ceab7ce40856e4979",
+        "patchedFingerprint": "b7f1190870264ce1ed750e083c9c2b17e32b0ea270164636ae19c71cb21d22b1"
       }
     ]
   },
@@ -118,6 +123,12 @@
         "fingerprint": "6cb1b9c1490fbb29df6045e3eb42f2ed05ba6bf975af5a1a897fd78482253a35",
         "savedScope": "conversation",
         "patchedFingerprint": "3c17032084a7c127c783fad33d2810d7fb0aa33608b772138291dc8b02ebea44"
+      },
+      {
+        "module": "17408",
+        "fingerprint": "19fef346369e6850993e12036edd40dc719dc8e6686cf0ffce639c8936cd5e7c",
+        "savedScope": "conversation",
+        "patchedFingerprint": "1e50efc051973ec9346944fcd57712992719885c49a0a3f644b854d033c3cefa"
       }
     ]
   },

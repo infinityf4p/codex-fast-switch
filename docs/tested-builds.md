@@ -1,5 +1,11 @@
 # Tested builds
 
+## 2026-11-21: macOS 29803 compatibility
+
+The worker rejected **26.1117.41037 (29803)** after its model query changed. The macOS request and saved-speed functions now use module `17408`. The shared adapters preserve lookup by thread ID and leave all **12** native GPT-6.2 model-query factories byte for byte. The generated catalog keeps the bundled model entries and adds Ultrafast metadata.
+
+An isolated install passed deep signature verification and **642 gate checks**. The patch edited **28 ASAR entries**, including the update hook. The bundled app-server, launched with the adapted plan and a dummy key, completed three `gpt-6.2-sol` replies against a loopback server. Standard omitted `service_tier`, Fast sent `priority`, and Ultrafast sent `ultrafast`. Restoring the copy reproduced the original signature and fingerprints. Build **29030** still passed recognition. The local suite passed **245 tests** with **25 platform-specific skips** and **0 failures**. This run covered isolated installation and backend requests. Live desktop UI and the official upgrade/relaunch cycle remain unverified for macOS 29803.
+
 ## 2026-11-21: Windows 29803 compatibility with native GPT-6.2 models
 
 The official Windows app had already updated to Store package **26.1117.4957.0**, containing app **26.1117.41037 (29803)**. Patch preparation stopped on the changed `j44z` model-query module, leaving the existing **27194** copy usable. Revision **14** recognizes the changed backend launch, request/saved-speed functions in both process scopes, native picker and updater interface. Saved speed now delegates by conversation ID, preserving provider-aware lookup.

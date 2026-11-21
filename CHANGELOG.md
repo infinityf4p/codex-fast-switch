@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Support macOS app 26.1117.41037 (29803). Recognize the macOS request modules and preserve thread-based saved speed and the native GPT-6.2 model query.
+
 - Windows patch revision 14 supports Store package 26.1117.4957.0 / app 26.1117.41037 (29803). Recognize the reorganized backend, both request scopes, native picker and updater interface. Preserve conversation-based saved-speed lookup and the native GPT-6.2 model query and metadata; only add Ultrafast speed metadata to the existing models.
 
 - Recognize macOS app 26.1111.71704 (29030), whose main-process request and saved-speed module moved to `22423`. Retain the reviewed full-function fingerprints and existing Ultrafast, native picker and signing behavior.
