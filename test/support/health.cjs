@@ -260,8 +260,10 @@ async function healthCheck(app, { onProgress = () => {}, screenshot, model: requ
         return Boolean(icon) === ${tier !== 'Standard'};
       })()`), `${tier} composer selection`);
       const count = requests.filter(item => item.model === model).length;
-      await cdp.call('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13 }, session);
-      await cdp.call('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13 }, session);
+      if (!await click('document.querySelector(\'button[aria-label="Send"]\')')) {
+        await cdp.call('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13 }, session);
+        await cdp.call('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13 }, session);
+      }
       await until(() => requests.filter(item => item.model === model).length > count, `${tier} request`);
       const request = requests.filter(item => item.model === model).at(-1);
       if (request.service_tier !== tiers[tier]) {

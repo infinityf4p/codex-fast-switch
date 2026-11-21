@@ -8,6 +8,8 @@ Each update publishes a new directory under `versions` and changes `windows-acti
 
 ## Native Update Button
 
+Revision 15 adds the speed catalog to the separate app-server host used by app 26.1117.41037 (29803). This restores **Ultrafast** in **Settings → General → Speed** for the bundled API-key backend, even when the official app is already on the same build. The updater offers revision 15 as a local patch update.
+
 Revision 14 recognizes app 26.1117.41037 (29803) and its updater's idle-install callback. The new request preparers look up saved speed by conversation ID, retaining the native provider selection and configuration handling. Both process scopes and all lazy UI copies are checked. The native GPT-6.2 Sol / Astra model entries, their capabilities and the model query stay unchanged; the separate backend catalog only gains Ultrafast speed metadata. Updated icon module aliases retain the filled Fast glyph and native compact picker.
 
 Revision 13 handles HTTP 404/410 from the official package URL by invoking the registered Microsoft App Installer's WinGet for product `9PLM9XGG6VKS` only. It never uninstalls the existing app first or upgrades unrelated packages. The helper verifies the actual registered version after WinGet returns; a zero exit code alone does not establish success. When the Store also has no applicable update, the current official package is retained and the dialog reports pending publication. That target is retried after five minutes; another target or a local patch update remains eligible immediately. Signature, network and deployment errors remain failures.

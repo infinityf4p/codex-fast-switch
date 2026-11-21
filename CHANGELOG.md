@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Windows patch revision 15 applies the Ultrafast catalog adapter to the separate app-server host in build 29803. The desktop Speed menu can display and save Ultrafast for the two native GPT-6.2 models.
+
 - Support macOS app 26.1117.41037 (29803). Recognize the macOS request modules and preserve thread-based saved speed and the native GPT-6.2 model query.
 
 - Windows patch revision 14 supports Store package 26.1117.4957.0 / app 26.1117.41037 (29803). Recognize the reorganized backend, both request scopes, native picker and updater interface. Preserve conversation-based saved-speed lookup and the native GPT-6.2 model query and metadata; only add Ultrafast speed metadata to the existing models.

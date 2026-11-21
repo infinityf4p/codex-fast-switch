@@ -8,7 +8,7 @@ The patch exposes controls already in the app. It does not provide OAuth access,
 
 New Rspack builds also support the native **Ultrafast** menu, sending `service_tier: "ultrafast"`. The patch supplies local API-key backends with speed metadata so older backends do not discard the requested tier. This covers GPT-6.1 Sol, GPT-6 Astra, and GPT-6.2 Sol / Astra selected in `config.toml`. Unselected new models stay hidden; OAuth and explicit custom catalogs retain their existing handling. Provider acceptance and the effective processing tier remain server-controlled. [Official Ultrafast guide](https://developers.openai.com/api/docs/guides/ultrafast-mode)
 
-Newer builds with native GPT-6.2 Sol / Astra entries, including Windows build 29803, retain the official model list and capability metadata. No additional model entries are needed; the patch only supplies speed support.
+Windows build 29803 includes native GPT-6.2 Sol / Astra. With patch revision 15, select **Ultrafast** under **Settings → General → Speed**.
 
 ## Preview
 

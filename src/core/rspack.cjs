@@ -11,9 +11,11 @@ const readFunction = source => require('./adaptive.cjs').parse(`(${source})`).bo
 // Rspack repeats a module in several lazy chunks. Validate every copy of a
 // reviewed module instead of treating those copies as independent UI gates.
 function modules(source) {
-  const { parse } = require('./adaptive.cjs');
+  return moduleTable(require('./adaptive.cjs').parse(source));
+}
+
+function moduleTable(ast) {
   const tables = [];
-  const ast = parse(source);
   for (const statement of ast.body) {
     if (statement.type === 'ExportNamedDeclaration' && statement.declaration?.type === 'VariableDeclaration') {
       for (const d of statement.declaration.declarations) {
@@ -70,30 +72,37 @@ function transform(source, fn, recipe, donor) {
 }
 
 function collect(entries, recipes = defaultRecipes) {
-  const { shape } = require('./adaptive.cjs');
+  const { parse, shape } = require('./adaptive.cjs');
   const matches = [];
+  const entryPath = entry => entry.entry.replaceAll('\\', '/');
+  const applies = (recipe, entry) => recipe.scope === entry.scope && (!recipe.entry || recipe.entry === entryPath(entry));
+  // Older builds launch from a module. Newer ones can also bundle an independent utility entry.
+  const required = recipes.filter(recipe => !recipe.entry || entries.some(entry => applies(recipe, entry)));
+  const variants = recipe => [recipe, ...(recipe.compatibleVariants || []).map(variant => ({ ...recipe, ...variant }))];
   for (const entry of entries) {
-    const scoped = recipes.filter(r => r.scope === entry.scope);
-    const variants = recipe => [recipe, ...(recipe.compatibleVariants || []).map(variant => ({ ...recipe, ...variant }))];
-    if (!scoped.some(r => variants(r).some(v => entry.source.includes(v.module)))) continue;
-    const table = modules(entry.source);
+    const scoped = required.filter(recipe => applies(recipe, entry) &&
+      (recipe.entry || variants(recipe).some(v => entry.source.includes(v.module))));
+    if (!scoped.length) continue;
+    const ast = parse(entry.source);
+    const table = moduleTable(ast);
     for (const recipe of scoped) {
       const known = variants(recipe);
-      for (const id of new Set(known.map(v => v.module))) {
-        const factory = table.get(id);
-        if (!factory) continue;
+      const roots = recipe.entry ? [[ast, known, 'standalone entry']] : [...new Set(known.map(v => v.module))]
+        .filter(id => table.has(id)).map(id => [table.get(id), known.filter(v => v.module === id), `module ${id}`]);
+      for (const [root, candidates, label] of roots) {
         const found = [];
-        walk.full(factory, fn => {
+        walk.full(root, fn => {
           if (!functionTypes.has(fn.type) || fn.end - fn.start > 16000) return;
-          const variant = known.find(v => v.module === id && shape(fn).fingerprint === v.fingerprint);
+          const fingerprint = shape(fn).fingerprint;
+          const variant = candidates.find(v => fingerprint === v.fingerprint);
           if (variant) found.push({ fn, recipe: variant });
         });
-        if (found.length !== 1) throw new Error(`Cannot recognize Rspack ${recipe.kind} in module ${id} (${entry.entry}).`);
+        if (found.length !== 1) throw new Error(`Cannot recognize Rspack ${recipe.kind} in ${label} (${entry.entry}).`);
         matches.push({ ...entry, ...found[0], requirement: recipe });
       }
     }
   }
-  for (const recipe of recipes) {
+  for (const recipe of required) {
     if (!matches.some(m => m.requirement === recipe)) throw new Error(`Missing Rspack ${recipe.kind} module ${recipe.module} in ${recipe.scope}.`);
   }
   return matches;
@@ -201,13 +210,18 @@ function isRspack(archive, files) {
 
 async function planArchive(archive, files) {
   const entries = [];
+  const recipes = defaultRecipes.filter(recipe => !recipe.platform || recipe.platform === process.platform);
   for (const file of files) {
+    const entryPath = file.replaceAll('\\', '/');
     const info = asar.statFile(archive, file);
-    if (info.unpacked || info.link || info.size > 32 * 1024 * 1024) continue;
-    entries.push({ entry: file, scope: file.replaceAll('\\', '/').startsWith('.vite/') ? 'main' : 'webview',
+    if (info.unpacked || info.link || info.size > 32 * 1024 * 1024) {
+      if (recipes.some(recipe => recipe.entry === entryPath)) throw new Error(`Unsupported Rspack standalone entry: ${file}.`);
+      continue;
+    }
+    entries.push({ entry: file, scope: entryPath.startsWith('.vite/') ? 'main' : 'webview',
       source: asar.extractFile(archive, file).toString('utf8') });
   }
-  return plan(entries);
+  return plan(entries, recipes);
 }
 
 module.exports = { modules, collect, transform, plan, validate, isRspack, planArchive };

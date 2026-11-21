@@ -63,6 +63,25 @@ test('Rspack accepts reviewed module variants without ignoring an unknown copy o
   await assert.rejects(plan([older, chunk('bad', source.replace('replace(', 'replaceAll('))], variants), /Cannot recognize/);
 });
 
+test('a shipped standalone app-server host must receive the speed adapter', async () => {
+  const launcher = 'function launch(options){const cli=options.cli;return {executablePath:cli.executablePath,args:options.args,env:options.env}}';
+  const fn = parse(launcher).body[0];
+  const { inject } = require('../../src/core/backend-speed.cjs');
+  const edited = inject(launcher, fn);
+  const host = { entry: '.vite\\build\\app-server-host.js', scope: 'main', source: `${launcher};exports.launch=launch;` };
+  const utility = { kind: 'api-ultrafast-backend', entry: '.vite/build/app-server-host.js', scope: 'main',
+    fingerprint: shape(fn).fingerprint, patchedFingerprint: fingerprint(edited) };
+  const recipes = [recipe, utility];
+  const renderer = chunk('renderer');
+  const other = { ...host, entry: '.vite/build/other.js' };
+  assert.deepEqual((await plan([renderer, other], recipes)).targets.map(t => t.entry), [renderer.entry]);
+  const result = await plan([renderer, host], recipes);
+  assert.deepEqual(result.targets.map(t => t.entry), [renderer.entry, host.entry]);
+  assert.equal(result.targets[1].patched.toString(), `${edited};exports.launch=launch;`);
+  await assert.rejects(plan([renderer, { ...host, source: host.source.replace('options.env', 'options.other') }], recipes),
+    /Cannot recognize Rspack api-ultrafast-backend in standalone entry/);
+});
+
 test('a reviewed native model query is retained byte for byte while other lazy modules are patched', async () => {
   const native = 'function(config){return {models:config.models,provider:config.provider};}';
   const query = { kind: 'api-configured-model', module: 'Catalog', scope: 'webview', fingerprint: 'older-query',

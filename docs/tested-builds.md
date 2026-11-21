@@ -1,5 +1,11 @@
 # Tested builds
 
+## 2026-11-21: Windows 29803 Ultrafast desktop menu
+
+On build **29803**, revision **14** showed only Standard and Fast in the desktop Speed menu. Its app-server ran from a separate utility entry that had not received the speed catalog adapter. Revision **15** recognizes and patches that entry as well as the main bundle. An isolated installed copy passed the embedded ASAR integrity check.
+
+The Windows desktop probe opened the native Speed menu, selected each of its three entries, and checked the saved selection. With a dummy API key and a loopback model endpoint, GPT-6.2 Sol completed three replies. Ultrafast sent `ultrafast`, Fast sent `priority`, and Standard omitted `service_tier`. The full local suite passed **260 tests** with **11 skips** and **0 failures**.
+
 ## 2026-11-21: macOS 29803 compatibility
 
 The worker rejected **26.1117.41037 (29803)** after its model query changed. The macOS request and saved-speed functions now use module `17408`. The shared adapters preserve lookup by thread ID and leave all **12** native GPT-6.2 model-query factories byte for byte. The generated catalog keeps the bundled model entries and adds Ultrafast metadata.
